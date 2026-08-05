@@ -2,11 +2,7 @@
 
 import { Database, HardDriveDownload, TriangleAlert } from "lucide-react";
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { UsageSnapshot } from "@/types/usage";
 
 /**
@@ -23,25 +19,31 @@ export function CostMeter({ snapshot }: { snapshot: UsageSnapshot }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="bg-muted/60 flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-left">
-          <MeterIcon snapshot={snapshot} />
-          <div className="leading-none">
-            <div className="font-mono text-sm font-semibold tabular-nums">
+        <button
+          type="button"
+          className="bg-card/70 hover:border-primary/30 focus-visible:ring-ring/60 flex items-center gap-2 rounded-full border py-1 pr-3 pl-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <span className="bg-accent text-accent-foreground flex size-6 shrink-0 items-center justify-center rounded-full">
+            <MeterIcon snapshot={snapshot} />
+          </span>
+
+          <span className="leading-none">
+            <span className="block font-mono text-[0.8125rem] font-semibold">
               {formatUsd(snapshot.totalCostUsd)}
-            </div>
-            <div className="text-muted-foreground mt-0.5 text-[10px] tracking-wide uppercase">
+            </span>
+            <span className="text-muted-foreground mt-0.5 hidden text-[9px] font-medium tracking-widest uppercase lg:block">
               total spend
-            </div>
-          </div>
-        </div>
+            </span>
+          </span>
+        </button>
       </TooltipTrigger>
 
-      <TooltipContent side="bottom" align="end" className="max-w-xs">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      <TooltipContent side="bottom" align="end" className="max-w-xs p-3">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
           <Row label="Model" value={snapshot.modelLabel} />
           <Row
             label="Rate"
-            value={`$${snapshot.inputPerMTok}/$${snapshot.outputPerMTok} per 1M in/out`}
+            value={`$${snapshot.inputPerMTok} / $${snapshot.outputPerMTok} per 1M`}
           />
           <Row label="Conversations" value={snapshot.sessionCount.toLocaleString()} />
           <Row label="Model calls" value={snapshot.requestCount.toLocaleString()} />
@@ -52,7 +54,7 @@ export function CostMeter({ snapshot }: { snapshot: UsageSnapshot }) {
           <Row label="Per conversation" value={formatUsd(perConversation)} />
         </dl>
 
-        <p className="text-muted-foreground mt-2 border-t pt-2 text-[11px]">
+        <p className="text-muted-foreground mt-2.5 border-t pt-2.5 text-[11px] leading-relaxed">
           {!snapshot.priced
             ? "This model has no row in pricing.ts, so calls are counted but priced at $0."
             : snapshot.persistent
@@ -68,20 +70,20 @@ export function CostMeter({ snapshot }: { snapshot: UsageSnapshot }) {
 
 function MeterIcon({ snapshot }: { snapshot: UsageSnapshot }) {
   if (!snapshot.priced) {
-    return <TriangleAlert className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />;
+    return <TriangleAlert className="size-3 text-amber-600 dark:text-amber-400" />;
   }
   return snapshot.persistent ? (
-    <Database className="text-muted-foreground size-3.5 shrink-0" />
+    <Database className="size-3" />
   ) : (
-    <HardDriveDownload className="text-muted-foreground size-3.5 shrink-0" />
+    <HardDriveDownload className="size-3" />
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-mono tabular-nums">{value}</dd>
+      <dt className="text-muted-foreground whitespace-nowrap">{label}</dt>
+      <dd className="text-right font-mono">{value}</dd>
     </>
   );
 }

@@ -22,9 +22,9 @@ export function Transcript({ items, empty }: TranscriptProps) {
 
   return (
     <ScrollArea className="h-full">
-      <div className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-6">
+      <div className="measure flex flex-col gap-4 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {items.length === 0 ? empty : items.map((item) => <Item key={item.id} item={item} />)}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="h-2" />
       </div>
     </ScrollArea>
   );
@@ -34,11 +34,13 @@ function Item({ item }: { item: TranscriptItem }) {
   switch (item.kind) {
     case "message":
       return <MessageBubble message={item} />;
+
     case "tool":
       return <ToolCard tool={item} />;
+
     case "usage":
       return (
-        <p className="text-muted-foreground pl-1 font-mono text-[10px] tabular-nums">
+        <p className="text-muted-foreground/70 font-mono text-[10px] tracking-tight sm:pl-4">
           {item.estimated && "~"}
           {item.promptTokens.toLocaleString()} in · {item.completionTokens.toLocaleString()} out
           {" · "}
@@ -46,9 +48,10 @@ function Item({ item }: { item: TranscriptItem }) {
           {item.estimated && " (estimated)"}
         </p>
       );
+
     case "notice":
       return (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="rounded-xl">
           <AlertDescription>{item.text}</AlertDescription>
         </Alert>
       );

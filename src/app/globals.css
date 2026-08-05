@@ -4,12 +4,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ==========================================================================
+   Bookly design system
+   --------------------------------------------------------------------------
+   Direction: "editorial ink" — a support console that reads like a well-made
+   reading app rather than a dashboard. Three deliberate departures from
+   stock shadcn:
+
+     1. Warm neutrals. Stock shadcn uses chroma-0 greys, which read cold and
+        clinical. Every neutral here carries a little warmth (hue ~75-85), so
+        surfaces feel like paper instead of concrete.
+     2. A deep ink-green primary instead of near-black. Bookish, confident,
+        and deliberately not the indigo/violet that every AI product defaults to.
+     3. Layered surfaces. The page sits *below* cards, so elevation comes from
+        real tonal separation plus hairline borders, not heavy drop shadows.
+
+   Components are untouched shadcn — all of this arrives through the tokens
+   they already consume.
+   ========================================================================== */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
+  --font-heading: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -27,6 +47,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -39,92 +60,254 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) * 1.35);
+  --radius-2xl: calc(var(--radius) * 1.75);
+  --radius-3xl: calc(var(--radius) * 2.25);
+  --radius-4xl: calc(var(--radius) * 2.75);
+}
+
+/*
+ * Collapsible open/close. Radix measures the panel and exposes its height as
+ * --radix-collapsible-content-height, which is the only way to animate to
+ * "auto" without a JS measurement pass.
+ */
+@theme {
+  --animate-collapsible-down: collapsible-down 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-collapsible-up: collapsible-up 180ms cubic-bezier(0.32, 0.72, 0, 1);
+
+  @keyframes collapsible-down {
+    from {
+      height: 0;
+      opacity: 0;
+    }
+    to {
+      height: var(--radix-collapsible-content-height);
+      opacity: 1;
+    }
+  }
+
+  @keyframes collapsible-up {
+    from {
+      height: var(--radix-collapsible-content-height);
+      opacity: 1;
+    }
+    to {
+      height: 0;
+      opacity: 0;
+    }
+  }
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --font-sans:
+    var(--font-instrument-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --radius: 0.75rem;
+
+  /* Warm paper neutrals. */
+  --background: oklch(0.984 0.0035 85);
+  --foreground: oklch(0.223 0.011 72);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.223 0.011 72);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.223 0.011 72);
+
+  /* Deep ink green. */
+  --primary: oklch(0.407 0.072 166);
+  --primary-foreground: oklch(0.985 0.008 160);
+
+  --secondary: oklch(0.958 0.006 85);
+  --secondary-foreground: oklch(0.29 0.012 74);
+  --muted: oklch(0.962 0.005 85);
+  --muted-foreground: oklch(0.508 0.011 76);
+  --accent: oklch(0.945 0.019 166);
+  --accent-foreground: oklch(0.33 0.055 166);
+
+  --destructive: oklch(0.553 0.196 26);
+  --success: oklch(0.53 0.11 158);
+
+  --border: oklch(0.902 0.005 85);
+  --input: oklch(0.895 0.005 85);
+  --ring: oklch(0.407 0.072 166);
+
+  --chart-1: oklch(0.407 0.072 166);
+  --chart-2: oklch(0.58 0.09 166);
+  --chart-3: oklch(0.68 0.075 90);
+  --chart-4: oklch(0.62 0.13 45);
+  --chart-5: oklch(0.45 0.06 240);
+
+  --sidebar: oklch(0.972 0.004 85);
+  --sidebar-foreground: oklch(0.223 0.011 72);
+  --sidebar-primary: oklch(0.407 0.072 166);
+  --sidebar-primary-foreground: oklch(0.985 0.008 160);
+  --sidebar-accent: oklch(0.945 0.019 166);
+  --sidebar-accent-foreground: oklch(0.33 0.055 166);
+  --sidebar-border: oklch(0.902 0.005 85);
+  --sidebar-ring: oklch(0.407 0.072 166);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Warm charcoal, not blue-black — keeps the paper feeling after dark. */
+  --background: oklch(0.161 0.005 75);
+  --foreground: oklch(0.955 0.004 85);
+  --card: oklch(0.204 0.006 75);
+  --card-foreground: oklch(0.955 0.004 85);
+  --popover: oklch(0.216 0.006 75);
+  --popover-foreground: oklch(0.955 0.004 85);
+
+  /* Lifted so it still carries white-ish text and glows on a dark ground. */
+  --primary: oklch(0.708 0.114 166);
+  --primary-foreground: oklch(0.18 0.03 166);
+
+  --secondary: oklch(0.258 0.006 75);
+  --secondary-foreground: oklch(0.955 0.004 85);
+  --muted: oklch(0.248 0.006 75);
+  --muted-foreground: oklch(0.686 0.008 80);
+  --accent: oklch(0.30 0.031 166);
+  --accent-foreground: oklch(0.87 0.062 166);
+
+  --destructive: oklch(0.674 0.174 22);
+  --success: oklch(0.72 0.115 158);
+
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.708 0.114 166);
+
+  --chart-1: oklch(0.708 0.114 166);
+  --chart-2: oklch(0.58 0.09 166);
+  --chart-3: oklch(0.75 0.09 90);
+  --chart-4: oklch(0.68 0.14 45);
+  --chart-5: oklch(0.62 0.09 240);
+
+  --sidebar: oklch(0.204 0.006 75);
+  --sidebar-foreground: oklch(0.955 0.004 85);
+  --sidebar-primary: oklch(0.708 0.114 166);
+  --sidebar-primary-foreground: oklch(0.18 0.03 166);
+  --sidebar-accent: oklch(0.30 0.031 166);
+  --sidebar-accent-foreground: oklch(0.87 0.062 166);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.708 0.114 166);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
     @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numbers in the meter and token counts must not jitter as they tick up. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Slim, theme-aware scrollbars — the default chrome undoes a lot of polish. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /*
+   * Ambient wash behind the conversation. Two very low-opacity radial tints
+   * rather than a linear gradient — a gradient would band across large
+   * screens, and this reads as light in the room instead of a painted panel.
+   */
+  .app-ambient {
+    background-image:
+      radial-gradient(
+        60rem 32rem at 50% -8rem,
+        color-mix(in oklab, var(--primary) 9%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        44rem 26rem at 92% 0%,
+        color-mix(in oklab, var(--chart-3) 7%, transparent),
+        transparent 72%
+      );
+  }
+
+  .dark .app-ambient {
+    background-image:
+      radial-gradient(
+        60rem 32rem at 50% -8rem,
+        color-mix(in oklab, var(--primary) 13%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        44rem 26rem at 92% 0%,
+        color-mix(in oklab, var(--chart-3) 8%, transparent),
+        transparent 72%
+      );
+  }
+
+  /*
+   * Elevation as tonal separation + a hairline, not a heavy shadow.
+   * The inset top highlight is what makes a card read as *lifted* rather
+   * than merely outlined.
+   */
+  .surface {
+    @apply bg-card border rounded-xl;
+    box-shadow:
+      0 1px 2px -1px color-mix(in oklab, var(--foreground) 8%, transparent),
+      0 4px 16px -8px color-mix(in oklab, var(--foreground) 10%, transparent),
+      inset 0 1px 0 0 color-mix(in oklab, white 60%, transparent);
+  }
+
+  .dark .surface {
+    box-shadow:
+      0 1px 2px -1px oklch(0 0 0 / 40%),
+      0 4px 16px -8px oklch(0 0 0 / 50%),
+      inset 0 1px 0 0 color-mix(in oklab, white 6%, transparent);
+  }
+}
+
+/*
+ * Content measure. Chat is a reading surface, so the column is capped for
+ * line length — but the cap grows on large displays instead of stranding the
+ * conversation in a narrow ribbon on a 32" monitor.
+ */
+@utility measure {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 48rem;
+
+  @variant xl {
+    max-width: 56rem;
+  }
+
+  @variant 2xl {
+    max-width: 64rem;
   }
 }
