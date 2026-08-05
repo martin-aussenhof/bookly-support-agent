@@ -58,6 +58,16 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "and ship a replacement at no cost.",
   },
   {
+    id: "kb-damaged-item",
+    title: "Damaged, faulty, or wrong item received",
+    keywords: ["damaged", "faulty", "broken", "torn", "wrong", "incorrect", "defective", "ripped"],
+    body:
+      "If a book arrives damaged or we sent the wrong title, start a return and " +
+      "choose 'damaged' or 'wrong item' as the reason. Bookly pays the return " +
+      "postage on these, so the full purchase price is refunded with no " +
+      "£2.99 label fee deducted. Photographs are not required.",
+  },
+  {
     id: "kb-cancel-order",
     title: "Cancelling or changing an order",
     keywords: ["cancel", "change", "amend", "address", "modify", "stop"],

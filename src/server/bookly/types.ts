@@ -19,7 +19,24 @@ export interface OrderItem {
   author: string;
   quantity: number;
   unitPriceCents: number;
+  /**
+   * Signed, personalised, and clearance stock is final sale — see the
+   * "Return window and eligibility" help-centre article.
+   */
+  finalSale?: boolean;
 }
+
+/**
+ * Why an item is coming back. Fault reasons waive the return-label fee, so
+ * this is a priced field, not a free-text note — the customer's own wording
+ * still travels alongside it as `reason`.
+ */
+export type ReturnReasonCode =
+  | "damaged"
+  | "wrong_item"
+  | "not_as_described"
+  | "changed_mind"
+  | "other";
 
 export interface Shipment {
   carrier: string;

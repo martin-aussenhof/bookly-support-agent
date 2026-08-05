@@ -13,6 +13,13 @@ const schema = z.object({
       "The SKU of the single item being returned. Get this from lookup_order; " +
         "if the order has several items, ask the customer which one first.",
     ),
+  reasonCode: z
+    .enum(["damaged", "wrong_item", "not_as_described", "changed_mind", "other"])
+    .describe(
+      "Category for the return. This is priced: 'damaged' and 'wrong_item' are " +
+        "Bookly's fault and waive the return-label fee. Pick the one that matches " +
+        "what the customer actually said — do not guess 'damaged' to be generous.",
+    ),
   reason: z
     .string()
     .describe("The customer's own words for why they are returning the item."),
@@ -32,10 +39,10 @@ export const startReturn = defineTool({
     "creates a real return the customer will be charged a label fee for.",
   mutating: true,
   schema,
-  async execute({ orderId, email, sku, reason }, ctx) {
+  async execute({ orderId, email, sku, reason, reasonCode }, ctx) {
     try {
       const order = await getOrderForCustomer(orderId, email);
-      const eligibility = checkReturnEligibility(order, sku);
+      const eligibility = checkReturnEligibility(order, sku, reasonCode);
 
       if (!eligibility.eligible) {
         return {
@@ -51,7 +58,7 @@ export const startReturn = defineTool({
         };
       }
 
-      const request = await createReturn({ order, sku, reason });
+      const request = await createReturn({ order, sku, reason, reasonCode });
       ctx.remember({
         verifiedEmail: email,
         createdReturnIds: [...ctx.facts.createdReturnIds, request.id],
@@ -64,9 +71,11 @@ export const startReturn = defineTool({
           status: request.status,
           refundCents: request.refundCents,
           labelFeeCents: eligibility.feeCents,
+          labelFeeWaived: eligibility.feeCents === 0,
           nextSteps:
             "A prepaid label has been emailed to the customer. The refund is issued " +
-            "once the parcel is scanned at the warehouse (3-5 business days after that).",
+            "once the parcel is scanned at the warehouse (3-5 business days after that). " +
+            "Tell the customer the exact refund amount and whether the label fee applied.",
         },
       };
     } catch (error) {

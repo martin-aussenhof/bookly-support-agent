@@ -45,19 +45,45 @@ One honest caveat: Together's streaming schema marks `usage` as nullable and has
 falls back to a ~4-chars-per-token estimate and flags the row `estimated` — visible in the
 meter tooltip and as a `~` in the per-turn line. The meter never silently reports zero.
 
-## Try these
+## Demo data
 
-The fixtures are seeded so each path is reachable from the UI:
+Eight orders across four customers, in
+[`src/server/bookly/data/orders.ts`](src/server/bookly/data/orders.ts). Dates are stored as
+offsets from *now*, so the inside/outside-the-return-window cases stay correct whenever you
+run it. Each order exists to make one branch reachable.
 
-| Say this | What it exercises |
-| --- | --- |
-| "Where's my order?" | Multi-turn slot filling — the agent needs an order number *and* an email before it can look anything up |
-| "I want to return a book" with order `BK-10432` / `maya.chen@example.com` | Two-item order → the agent asks *which* book before acting |
-| "How long do refunds take?" | Grounded retrieval — answered only from the help centre |
-| Return something on `BK-09877` / `sam.okafor@example.com` | Delivered 58 days ago → policy refusal, then an offer to escalate |
-| "Can I speak to a person?" | Structured handover with a written note |
+The agent will not open an order without a matching email — that check is enforced in the
+backend, so these pairs are the credentials for the demo:
 
-Seeded orders live in [`src/server/bookly/data/orders.ts`](src/server/bookly/data/orders.ts).
+| Order | Email | State |
+| --- | --- | --- |
+| `BK-10432` | `maya.chen@example.com` | Delivered 4d ago, **2 items** |
+| `BK-10588` | `maya.chen@example.com` | In transit, arrives in 2d |
+| `BK-10774` | `maya.chen@example.com` | Delivered, contains a **signed edition** (final sale) |
+| `BK-09877` | `sam.okafor@example.com` | Delivered **58d ago** — outside the window |
+| `BK-10601` | `sam.okafor@example.com` | Still processing — cancellable, not returnable |
+| `BK-10655` | `priya.raman@example.com` | Delivered 3d ago — the **damaged** book |
+| `BK-10233` | `priya.raman@example.com` | Marked delivered 6d ago, never arrived |
+| `BK-10702` | `james.whitlock@example.com` | Out for delivery, 3 items, £57.47 |
+
+### Demo script
+
+| Say this | What it exercises | Expected |
+| --- | --- | --- |
+| "Where's my order?" | Multi-turn slot filling | Asks for order number *and* email before looking anything up |
+| Return on `BK-10432` | Ambiguity → clarifying question | Two items, so it asks *which* book first |
+| "It arrived damaged" on `BK-10655` | Policy priced from data | Fee **waived** — £14.50 refunded in full |
+| "Changed my mind" on `BK-10432` | The other side of the same policy | £2.99 label fee → **£16.00** refund |
+| Return the signed book on `BK-10774` | Final-sale refusal | Refused; the other item in that order is still returnable |
+| Return on `BK-09877` | Return window | Refused — delivered 58 days ago |
+| Return on `BK-10601` | Wrong lifecycle stage | Refused — not delivered yet; offers cancellation |
+| "My parcel says delivered but isn't here" (`BK-10233`) | Grounded retrieval + action | Cites the carrier-investigation policy |
+| "How long do refunds take?" | Grounded retrieval | Answered only from the help centre |
+| "Do you sell vinyl records?" | **Refusal to invent** | Retrieval returns nothing → says so, offers a human |
+| "Can I speak to a person?" | Structured handover | Escalation with a written note for the colleague |
+
+The last two are the ones worth showing. An agent that answers everything is easy; one that
+says "I can't confirm that" when retrieval comes back empty is the point.
 
 ## Architecture
 

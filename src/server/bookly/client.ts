@@ -6,6 +6,7 @@ import {
   BooklyError,
   type HelpArticle,
   type Order,
+  type ReturnReasonCode,
   type ReturnRequest,
 } from "./types";
 
@@ -66,7 +67,14 @@ export interface ReturnEligibility {
   feeCents: number;
 }
 
-export function checkReturnEligibility(order: Order, sku: string): ReturnEligibility {
+/** Fault reasons. Bookly pays the return postage on these. */
+const FAULT_REASONS: ReadonlySet<ReturnReasonCode> = new Set(["damaged", "wrong_item"]);
+
+export function checkReturnEligibility(
+  order: Order,
+  sku: string,
+  reasonCode: ReturnReasonCode,
+): ReturnEligibility {
   const item = order.items.find((i) => i.sku === sku);
   const base: ReturnEligibility = {
     eligible: false,
@@ -78,6 +86,12 @@ export function checkReturnEligibility(order: Order, sku: string): ReturnEligibi
 
   if (!item) {
     return { ...base, reason: `Order ${order.id} does not contain SKU ${sku}.` };
+  }
+  if (item.finalSale) {
+    return {
+      ...base,
+      reason: `"${item.title}" is a signed or clearance edition and is final sale, so it cannot be returned.`,
+    };
   }
   if (!order.shipment?.deliveredAt) {
     return {
@@ -97,13 +111,21 @@ export function checkReturnEligibility(order: Order, sku: string): ReturnEligibi
     };
   }
 
+  // The help centre promises free return postage on faulty or mis-shipped
+  // items. Encoding that here rather than trusting the agent to remember it is
+  // what stops the reply and the receipt disagreeing.
+  const atFault = FAULT_REASONS.has(reasonCode);
+  const feeCents = atFault ? 0 : RETURN_LABEL_FEE_CENTS;
   const gross = item.unitPriceCents * item.quantity;
+
   return {
     eligible: true,
-    reason: `Delivered ${daysSinceDelivery} days ago, inside the ${RETURN_WINDOW_DAYS}-day return window.`,
+    reason: atFault
+      ? `Delivered ${daysSinceDelivery} days ago, inside the ${RETURN_WINDOW_DAYS}-day window. Item is faulty or mis-shipped, so return postage is free.`
+      : `Delivered ${daysSinceDelivery} days ago, inside the ${RETURN_WINDOW_DAYS}-day window. A £${(RETURN_LABEL_FEE_CENTS / 100).toFixed(2)} return-label fee applies.`,
     daysSinceDelivery,
-    refundCents: gross - RETURN_LABEL_FEE_CENTS,
-    feeCents: RETURN_LABEL_FEE_CENTS,
+    refundCents: gross - feeCents,
+    feeCents,
   };
 }
 
@@ -111,9 +133,10 @@ export async function createReturn(input: {
   order: Order;
   sku: string;
   reason: string;
+  reasonCode: ReturnReasonCode;
 }): Promise<ReturnRequest> {
   await delay();
-  const eligibility = checkReturnEligibility(input.order, input.sku);
+  const eligibility = checkReturnEligibility(input.order, input.sku, input.reasonCode);
   if (!eligibility.eligible) {
     throw new BooklyError(eligibility.reason, "conflict");
   }
