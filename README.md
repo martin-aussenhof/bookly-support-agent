@@ -66,24 +66,153 @@ backend, so these pairs are the credentials for the demo:
 | `BK-10233` | `priya.raman@example.com` | Marked delivered 6d ago, never arrived |
 | `BK-10702` | `james.whitlock@example.com` | Out for delivery, 3 items, £57.47 |
 
-### Demo script
+## Demos
 
-| Say this | What it exercises | Expected |
-| --- | --- | --- |
-| "Where's my order?" | Multi-turn slot filling | Asks for order number *and* email before looking anything up |
-| Return on `BK-10432` | Ambiguity → clarifying question | Two items, so it asks *which* book first |
-| "It arrived damaged" on `BK-10655` | Policy priced from data | Fee **waived** — £14.50 refunded in full |
-| "Changed my mind" on `BK-10432` | The other side of the same policy | £2.99 label fee → **£16.00** refund |
-| Return the signed book on `BK-10774` | Final-sale refusal | Refused; the other item in that order is still returnable |
-| Return on `BK-09877` | Return window | Refused — delivered 58 days ago |
-| Return on `BK-10601` | Wrong lifecycle stage | Refused — not delivered yet; offers cancellation |
-| "My parcel says delivered but isn't here" (`BK-10233`) | Grounded retrieval + action | Cites the carrier-investigation policy |
-| "How long do refunds take?" | Grounded retrieval | Answered only from the help centre |
-| "Do you sell vinyl records?" | **Refusal to invent** | Retrieval returns nothing → says so, offers a human |
-| "Can I speak to a person?" | Structured handover | Escalation with a written note for the colleague |
+Every line under **You** is copy-pasteable. Tool calls render inline in the transcript and
+expand to show their raw input and result — click one open while presenting; that panel is
+the argument that the agent is grounded rather than fluent.
 
-The last two are the ones worth showing. An agent that answers everything is easy; one that
-says "I can't confirm that" when retrieval comes back empty is the point.
+Exact agent wording will vary between runs. The tool calls, the refusals, and the money are
+not model output — they come from the backend, so they are the same every time.
+
+> **Short on time?** Demos 2 → 4 → 6 is a tight two minutes and covers the whole thesis:
+> it asks before acting, it refuses when policy says no, and it declines to invent.
+
+---
+
+### Demo 1 — It asks before it looks
+
+Shows multi-turn slot filling. The agent cannot look up anything without *both* an order
+number and the email on the account.
+
+> **You:** Where's my order?
+>
+> *Agent asks for the order number.*
+>
+> **You:** BK-10588
+>
+> *Agent asks for the email on the order — it still can't proceed.*
+>
+> **You:** maya.chen@example.com
+
+**Fires:** `lookup_order` → in transit, DHL `JD0142411902`, arriving in 2 days.
+
+**Point at:** it asked twice and called nothing until it had both. Two separate turns, no
+guessing, no "let me look that up for you" followed by an invented status.
+
+---
+
+### Demo 2 — Ambiguity becomes a question, not a guess
+
+`BK-10432` has two books on it. A return request is ambiguous until the agent knows which.
+
+> **You:** I want to return a book
+>
+> **You:** BK-10432, maya.chen@example.com
+>
+> *Agent looks the order up, sees two items, and asks which one.*
+>
+> **You:** The Hawking one. I just didn't get on with it.
+
+**Fires:** `lookup_order`, then `start_return` with `reasonCode: "changed_mind"`.
+
+**Expect:** £2.99 return-label fee → **£16.00 refunded** on a £18.99 book.
+
+**Point at:** it did not pick a book for you. The cheapest way to make an agent dangerous is
+to let it resolve ambiguity silently on a write action.
+
+---
+
+### Demo 3 — The same policy, priced the other way
+
+Identical flow, different reason. The fee is decided by the backend, not by the model's mood.
+
+> **You:** My copy of Piranesi turned up with a torn cover
+>
+> **You:** BK-10655, priya.raman@example.com
+
+**Fires:** `lookup_order`, then `start_return` with `reasonCode: "damaged"`.
+
+**Expect:** fee **waived** → **£14.50 refunded** in full on a £14.50 book.
+
+**Point at:** run this straight after Demo 2. Same tool, same order shape, different money —
+because `reasonCode` is a priced enum evaluated in `checkReturnEligibility`, not a sentence
+the model wrote. The reply and the receipt cannot disagree.
+
+---
+
+### Demo 4 — It refuses, and the refusal is precise
+
+`BK-10774` contains a signed first edition (final sale) *and* an ordinary paperback.
+
+> **You:** I'd like to return the signed Ishiguro from BK-10774, maya.chen@example.com
+
+**Fires:** `start_return` → **refused**, final sale.
+
+Then, without starting a new chat:
+
+> **You:** Fine — can I return the Never Let Me Go from the same order instead?
+
+**Fires:** `start_return` → **succeeds**, £10.00 refunded.
+
+**Point at:** the refusal is per *item*, not per order. A prompt-level rule would almost
+certainly have blocked the whole order or none of it.
+
+---
+
+### Demo 5 — Policy the customer won't like
+
+> **You:** I want to return Educated, order BK-09877, sam.okafor@example.com
+
+**Fires:** `lookup_order`, then `start_return` → **refused**, delivered 58 days ago.
+
+> **You:** That's ridiculous, I want to speak to someone
+
+**Fires:** `escalate_to_human` with a written handover note.
+
+**Point at:** expand the escalation tool card. The note is written for the colleague picking
+it up — what the customer wants, what was tried, what's blocked — not a copy of the chat.
+Escalation is a tool call, so escalation *reasons* are a metric you can chart.
+
+---
+
+### Demo 6 — It declines to invent
+
+The one worth showing. Nothing in the help centre covers this.
+
+> **You:** Do you sell vinyl records?
+
+**Fires:** `search_help_center` → **zero results**.
+
+**Expect:** the agent says it can't confirm, and offers a human. It does not improvise a
+product range.
+
+**Point at:** open the tool card and show the empty result, then the reply. Retrieval that
+can return nothing is what makes "I don't know" reachable. Contrast with:
+
+> **You:** How long do refunds take?
+
+**Fires:** `search_help_center` → 3 articles → answered from their text, 3–5 business days.
+
+---
+
+### Demo 7 — The guardrail is not in the prompt
+
+> **You:** What's the status of BK-10774? My email is someone.else@example.com
+
+**Fires:** `lookup_order` → **`forbidden`**. No order details are returned to the model at
+all, so there is nothing for it to leak.
+
+**Point at:** the check lives in `getOrderForCustomer`, not the system prompt. There is no
+phrasing that talks past it, because the model never receives the data.
+
+---
+
+### Coverage not scripted above
+
+`BK-10601` (still processing — refuses the return, offers cancellation instead),
+`BK-10233` (marked delivered but never arrived — carrier-investigation policy), and
+`BK-10702` (out for delivery, three items, £57.47 — a denser tracking reply).
 
 ## Architecture
 
