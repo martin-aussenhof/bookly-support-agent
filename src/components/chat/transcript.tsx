@@ -40,7 +40,7 @@ function Item({ item }: { item: TranscriptItem }) {
 
     case "usage":
       return (
-        <p className="text-muted-foreground/70 font-mono text-[10px] tracking-tight sm:pl-4">
+        <p className="text-muted-foreground/70 font-mono text-3xs tracking-tight sm:pl-4">
           {item.estimated && "~"}
           {item.promptTokens.toLocaleString()} in · {item.completionTokens.toLocaleString()} out
           {" · "}

@@ -31,7 +31,7 @@ export function CostMeter({ snapshot }: { snapshot: UsageSnapshot }) {
             <span className="block font-mono text-[0.8125rem] font-semibold">
               {formatUsd(snapshot.totalCostUsd)}
             </span>
-            <span className="text-muted-foreground mt-0.5 hidden text-[9px] font-medium tracking-widest uppercase lg:block">
+            <span className="text-muted-foreground mt-0.5 hidden text-3xs font-medium tracking-widest uppercase lg:block">
               total spend
             </span>
           </span>
@@ -54,7 +54,7 @@ export function CostMeter({ snapshot }: { snapshot: UsageSnapshot }) {
           <Row label="Per conversation" value={formatUsd(perConversation)} />
         </dl>
 
-        <p className="text-muted-foreground mt-2.5 border-t pt-2.5 text-[11px] leading-relaxed">
+        <p className="text-muted-foreground mt-2.5 border-t pt-2.5 text-2xs leading-relaxed">
           {!snapshot.priced
             ? "This model has no row in pricing.ts, so calls are counted but priced at $0."
             : snapshot.persistent

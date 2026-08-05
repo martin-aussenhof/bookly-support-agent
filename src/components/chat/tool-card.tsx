@@ -37,10 +37,10 @@ export function ToolCard({ tool }: { tool: ToolItem }) {
         <CollapsibleTrigger className="hover:bg-accent/40 focus-visible:ring-ring/60 flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
           <StatusIcon status={tool.status} />
 
-          <span className="font-mono text-[11px] font-medium tracking-tight">{tool.name}</span>
+          <span className="font-mono text-2xs font-medium tracking-tight">{tool.name}</span>
 
           {tool.mutating && (
-            <span className="bg-primary/12 text-primary hidden rounded-full px-1.5 py-0.5 text-[9px] font-semibold tracking-widest uppercase sm:inline-block">
+            <span className="bg-primary/12 text-primary hidden rounded-full px-1.5 py-0.5 text-3xs font-semibold tracking-widest uppercase sm:inline-block">
               action
             </span>
           )}
@@ -81,11 +81,11 @@ function StatusIcon({ status }: { status: ToolItem["status"] }) {
 function Payload({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="space-y-1.5">
-      <div className="text-muted-foreground/70 flex items-center gap-1.5 text-[9px] font-semibold tracking-[0.12em] uppercase">
+      <div className="text-muted-foreground/70 flex items-center gap-1.5 text-3xs font-semibold tracking-[0.12em] uppercase">
         <Zap className="size-2.5" />
         {label}
       </div>
-      <pre className="bg-muted/50 max-h-72 overflow-auto rounded-lg p-2.5 font-mono text-[11px] leading-relaxed">
+      <pre className="bg-muted/50 max-h-72 overflow-auto rounded-lg p-2.5 font-mono text-2xs leading-relaxed">
         {JSON.stringify(value, null, 2)}
       </pre>
     </div>

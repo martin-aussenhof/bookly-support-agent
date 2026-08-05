@@ -75,6 +75,24 @@
  * "auto" without a JS measurement pass.
  */
 @theme {
+  /*
+   * An extra stop above Tailwind's 2xl (96rem/1536px), for 1440p and wider.
+   * Media-query rem is always the browser's initial 16px — it does NOT follow
+   * the fluid html font-size below — so these stay predictable pixel values.
+   */
+  --breakpoint-3xl: 120rem;
+
+  /*
+   * Two steps below text-xs, for metadata (tool names, token counts, meter
+   * labels). Defined as tokens rather than written inline as `text-[11px]`
+   * so they are rem-based and scale with the root size instead of staying
+   * pinned at 11 physical pixels on a large display.
+   */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.45;
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 1.4;
+
   --animate-collapsible-down: collapsible-down 220ms cubic-bezier(0.32, 0.72, 0, 1);
   --animate-collapsible-up: collapsible-up 180ms cubic-bezier(0.32, 0.72, 0, 1);
 
@@ -202,6 +220,30 @@
   html {
     @apply font-sans;
     -webkit-tap-highlight-color: transparent;
+
+    /*
+     * Fluid root size — the single lever that makes the whole interface scale
+     * with the display instead of staying pinned at laptop proportions.
+     *
+     * Because Tailwind's spacing, radii, and font sizes are all rem-based,
+     * moving the root moves type, padding, gaps, icons, and the content
+     * measure together, so proportions and line length per row stay constant
+     * while everything gets physically larger.
+     *
+     *   ≤1280px → 16px   (laptops and below: unchanged)
+     *    1920px → 17.5px
+     *   ≥2560px → 19px   (1440p and up, clamped)
+     *
+     * Expressed in rem, not px, so a reader who has raised their browser's
+     * default font size still gets it — the whole curve shifts up with them
+     * instead of being overridden.
+     *
+     * Deliberately gentle: past ~19px the layout starts feeling zoomed rather
+     * than roomy, which is why this is a clamp and not a raw vw.
+     *
+     * ── To make everything larger, raise the 1.1875rem cap. ──
+     */
+    font-size: clamp(1rem, 0.8125rem + 0.234vw, 1.1875rem);
   }
 
   body {
@@ -294,9 +336,13 @@
 }
 
 /*
- * Content measure. Chat is a reading surface, so the column is capped for
- * line length — but the cap grows on large displays instead of stranding the
- * conversation in a narrow ribbon on a 32" monitor.
+ * Content measure. Chat is a reading surface, so the column is capped for line
+ * length — but the cap grows on large displays instead of stranding the
+ * conversation in a narrow ribbon on a 27" monitor.
+ *
+ * These are rem, so they ride the fluid root size above and the real widths
+ * are larger than the numbers suggest. On a 2560px display (root 19px):
+ * 68rem ≈ 1290px of content, not 1088px.
  */
 @utility measure {
   width: 100%;
@@ -308,6 +354,10 @@
   }
 
   @variant 2xl {
-    max-width: 64rem;
+    max-width: 62rem;
+  }
+
+  @variant 3xl {
+    max-width: 68rem;
   }
 }

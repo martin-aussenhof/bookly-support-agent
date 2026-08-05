@@ -77,7 +77,7 @@ export function Composer({ disabled, onSend }: ComposerProps) {
           </Button>
         </div>
 
-        <p className="text-muted-foreground/60 mt-2 hidden text-center text-[11px] sm:block">
+        <p className="text-muted-foreground/60 mt-2 hidden text-center text-2xs sm:block">
           <kbd className="font-sans font-medium">Enter</kbd> to send ·{" "}
           <kbd className="font-sans font-medium">Shift + Enter</kbd> for a new line
         </p>

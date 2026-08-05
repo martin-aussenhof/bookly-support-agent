@@ -105,7 +105,7 @@ function Wordmark() {
           <span className="font-display text-lg leading-none tracking-tight sm:text-xl">
             Bookly
           </span>
-          <span className="text-muted-foreground text-[11px] font-medium tracking-[0.14em] uppercase">
+          <span className="text-muted-foreground text-2xs font-medium tracking-[0.14em] uppercase">
             Support
           </span>
         </div>
