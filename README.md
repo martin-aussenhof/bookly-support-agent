@@ -20,10 +20,42 @@ pnpm dev                     # http://localhost:3000
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `TOGETHER_API_KEY` | yes | Together AI inference |
-| `DATABASE_URL` | no | Neon Postgres, for the cost meter. Without it the meter runs in memory and resets on restart. |
+| `DATABASE_URL` | no | Neon Postgres — stores conversations and the cost ledger. Without it both fall back to memory and reset on restart. |
 
-The `usage_events` table is created automatically on first write — a fresh Neon database
-needs no migration step. [`db/schema.sql`](db/schema.sql) is the readable version.
+Tables are created automatically on first write — a fresh Neon database needs no migration
+step. [`db/schema.sql`](db/schema.sql) is the readable version.
+
+## Conversation persistence
+
+Conversations survive a refresh, a closed tab, and a server restart.
+
+The handle is an **httpOnly cookie** (`bookly_session`, 30 days), issued by
+[`middleware.ts`](src/middleware.ts) before the page renders. Because the server knows the
+session at render time, the restored conversation is in the first paint — there is no
+hydration fetch and no empty-then-populated flash. httpOnly also means page scripts cannot
+read or forge the id, so the browser can no longer choose which conversation it is talking
+to; the client posts `{ message }` and nothing else.
+
+| Action | Result |
+| --- | --- |
+| Refresh | Conversation restored, server-rendered |
+| Close tab, return later | Restored (within 30 days) |
+| Server restart | Restored, if `DATABASE_URL` is set |
+| Close the tab mid-answer | The turn is cancelled and the partial answer is saved |
+| "New chat" | Transcript deleted and the cookie rotated — the old one is unreachable, not just hidden |
+
+Two things are stored per session, written in the same statement: `messages` (what the model
+reads) and `transcript` (what the browser renders). They are folded by the *same* reducer —
+[`src/agent/transcript.ts`](src/agent/transcript.ts), shared by the loop and the client hook —
+so a restored conversation is identical to the one you watched stream, tool cards and costs
+included, rather than a lookalike rebuilt by second implementation that would eventually drift.
+
+> ⚠️ **Transcripts are personal data.** They contain customer emails and order history. Rows
+> are swept after 30 days (`sweepExpiredSessions`, called opportunistically on "new chat";
+> in production this belongs in a scheduled job). There is no encryption at rest beyond
+> whatever Neon provides, and no per-user access control — the cookie *is* the credential.
+> A real deployment needs a retention policy agreed with legal and a deletion endpoint wired
+> to your DSAR process.
 
 ## Cost meter
 
@@ -230,7 +262,8 @@ Browser  ──POST /api/chat──▶  Route  ──▶  runAgent()  ──▶ 
 | `src/server/usage/pricing.ts` | **Token prices. The file to edit.** |
 | `src/server/usage/store.ts` | Neon-backed usage ledger, with an in-memory fallback. |
 | `src/agent/tools/` | One file per capability. Zod schema per tool, compiled to JSON Schema *and* used to validate what the model sends back. |
-| `src/agent/memory/` | Server-owned session state: the transcript the model sees, plus the structured facts the system trusts. |
+| `src/agent/memory/` | Server-owned session state, persisted to Neon: the transcript the model sees, the transcript the browser renders, and the structured facts the system trusts. |
+| `src/agent/transcript.ts` | The one reducer turning agent events into renderable items — shared by the loop and the client. |
 | `src/agent/prompts/` | System prompt, split into a frozen base and a per-turn facts block so the prefix stays stable. |
 | `src/server/bookly/` | Mock commerce API. Knows nothing about agents — swap for real HTTP calls without touching `src/agent/`. |
 | `src/components/chat/` | Transcript UI. Tool calls are rendered inline and expandable. |
@@ -255,9 +288,9 @@ and the transcript the model reads can't be edited by the client.
 ## Assumptions
 
 - Single fictional customer per session; no real auth. Identity is "the email matches the order",
-  which is the shape of a real verification step without the plumbing.
-- Sessions are in-memory and expire after an hour. Redis or Postgres would drop in behind the
-  three functions in `session-store.ts`.
+  which is the shape of a real verification step without the plumbing. The session cookie is
+  the only credential — anyone holding it holds the conversation.
+- Conversations persist for 30 days in Neon, or in memory when `DATABASE_URL` is unset.
 - Help-centre retrieval is keyword scoring, not embeddings — enough to demonstrate grounding,
   and behind a tool contract that a vector search can replace unchanged.
 - Prices in GBP. The mock backend adds ~350ms of latency so streaming and tool timing look real.

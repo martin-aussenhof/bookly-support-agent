@@ -21,3 +21,24 @@ CREATE INDEX IF NOT EXISTS usage_events_created_at_idx
 
 CREATE INDEX IF NOT EXISTS usage_events_session_id_idx
   ON usage_events (session_id);
+
+-- Conversations, keyed by the httpOnly session cookie.
+--
+-- `messages` is what the model reads; `transcript` is what the browser renders.
+-- Both are written in the same statement so a rehydrated conversation matches
+-- the one the customer watched stream in.
+--
+-- ⚠ Personal data: transcripts contain customer emails and order history.
+-- Rows are swept after 30 days (see sweepExpiredSessions).
+
+CREATE TABLE IF NOT EXISTS chat_sessions (
+  id         TEXT PRIMARY KEY,
+  messages   JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  facts      JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  transcript JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS chat_sessions_updated_at_idx
+  ON chat_sessions (updated_at DESC);

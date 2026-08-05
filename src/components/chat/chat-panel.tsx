@@ -1,7 +1,8 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useTransition } from "react";
 
 import { Composer } from "@/components/chat/composer";
 import { CostMeter } from "@/components/chat/cost-meter";
@@ -12,15 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAgentChat } from "@/hooks/use-agent-chat";
 import { useUsageMeter } from "@/hooks/use-usage-meter";
+import type { TranscriptItem } from "@/types/chat";
 import type { UsageSnapshot } from "@/types/usage";
 
-export function ChatPanel({ initialUsage }: { initialUsage: UsageSnapshot }) {
-  // One session per page load. The id is the only handle the client has on
-  // server-side conversation state.
-  const sessionId = useMemo(() => crypto.randomUUID(), []);
+interface ChatPanelProps {
+  initialUsage: UsageSnapshot;
+  /** The stored conversation, server-rendered from the session cookie. */
+  initialItems: TranscriptItem[];
+}
+
+export function ChatPanel({ initialUsage, initialItems }: ChatPanelProps) {
+  const router = useRouter();
+  const [isResetting, startReset] = useTransition();
 
   const { snapshot, refresh, applyTotal } = useUsageMeter(initialUsage);
-  const { items, isStreaming, send, reset } = useAgentChat(sessionId, {
+  const { items, isStreaming, send, setItems } = useAgentChat(initialItems, {
     // Move the meter the instant the turn ends, then re-sync so spend from
     // other users lands too.
     onTotalCost: (total) => {
@@ -28,6 +35,16 @@ export function ChatPanel({ initialUsage }: { initialUsage: UsageSnapshot }) {
       void refresh();
     },
   });
+
+  // The server owns the session, so "new chat" is a server operation: drop the
+  // stored transcript and rotate the cookie, then re-render from the new state.
+  const reset = useCallback(() => {
+    startReset(async () => {
+      await fetch("/api/chat", { method: "DELETE" });
+      setItems([]);
+      router.refresh();
+    });
+  }, [router, setItems]);
 
   return (
     <div className="app-ambient flex h-dvh flex-col">
@@ -45,7 +62,7 @@ export function ChatPanel({ initialUsage }: { initialUsage: UsageSnapshot }) {
               size="sm"
               className="hidden rounded-full sm:inline-flex"
               onClick={reset}
-              disabled={items.length === 0 && !isStreaming}
+              disabled={(items.length === 0 && !isStreaming) || isResetting}
             >
               <RotateCcw className="size-3.5" />
               New chat
@@ -57,7 +74,7 @@ export function ChatPanel({ initialUsage }: { initialUsage: UsageSnapshot }) {
               size="icon"
               className="size-9 rounded-full sm:hidden"
               onClick={reset}
-              disabled={items.length === 0 && !isStreaming}
+              disabled={(items.length === 0 && !isStreaming) || isResetting}
               aria-label="Start a new chat"
             >
               <RotateCcw className="size-4" />

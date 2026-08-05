@@ -10,10 +10,11 @@ import { calculateCostUsd } from "@/server/usage/pricing";
 import { getTotals, recordUsage } from "@/server/usage/store";
 import { AGENT_CONFIG } from "./config";
 import type { AgentEvent } from "./events";
-import { getOrCreateSession, updateFacts } from "./memory/session-store";
+import { loadSession, saveSession } from "./memory/session-store";
 import { buildSystemPrompt } from "./prompts/system";
 import { executeTool, getTool, toFunctionTools } from "./tools/registry";
 import { together } from "./together";
+import { appendUserMessage, applyAgentEvent } from "./transcript";
 
 /** A tool call reassembled from streaming deltas. */
 interface PendingToolCall {
@@ -36,10 +37,21 @@ export async function* runAgent(
   sessionId: string,
   userMessage: string,
 ): AsyncGenerator<AgentEvent> {
-  const session = getOrCreateSession(sessionId);
+  const session = await loadSession(sessionId);
   const tools = toFunctionTools() as ChatCompletionTool[];
 
   session.messages.push({ role: "user", content: userMessage });
+  session.transcript = appendUserMessage(session.transcript, userMessage);
+
+  /**
+   * Every event is mirrored into the persisted transcript on its way out, so
+   * what gets stored is exactly what the browser rendered. Yielding through
+   * one place also means no event can be persisted-but-not-sent, or vice versa.
+   */
+  const emit = (event: AgentEvent): AgentEvent => {
+    session.transcript = applyAgentEvent(session.transcript, event);
+    return event;
+  };
 
   let iterations = 0;
   let turnPromptTokens = 0;
@@ -68,7 +80,7 @@ export async function* runAgent(
         stream: true,
       });
 
-      yield { type: "message_start" };
+      yield emit({ type: "message_start" });
 
       let text = "";
       const toolCalls: PendingToolCall[] = [];
@@ -83,7 +95,7 @@ export async function* runAgent(
         const content = choice?.delta?.content;
         if (content) {
           text += content;
-          yield { type: "text_delta", text: content };
+          yield emit({ type: "text_delta", text: content });
         }
 
         // Tool calls stream in fragments keyed by index: the name arrives once,
@@ -149,13 +161,13 @@ export async function* runAgent(
       // Announce every call before running anything, so the UI can show what
       // the agent is doing while it happens.
       for (const call of calls) {
-        yield {
+        yield emit({
           type: "tool_call",
           id: call.id,
           name: call.name,
           input: safeParse(call.arguments),
           mutating: getTool(call.name)?.mutating ?? false,
-        };
+        });
       }
 
       // Parallel tool calls arrive in one assistant message; run them together
@@ -166,23 +178,24 @@ export async function* runAgent(
           result: await executeTool(call.name, call.arguments, {
             sessionId,
             facts: session.facts,
+            // Mutating the loaded session is enough — it is persisted with the
+            // rest of the turn in the `finally` below.
             remember: (patch) => {
               session.facts = { ...session.facts, ...patch };
-              updateFacts(sessionId, patch);
             },
           }),
         })),
       );
 
       for (const { call, result } of executions) {
-        yield {
+        yield emit({
           type: "tool_result",
           id: call.id,
           name: call.name,
           summary: result.summary,
           isError: result.isError ?? false,
           data: result.data,
-        };
+        });
 
         session.messages.push({
           role: "tool",
@@ -193,7 +206,7 @@ export async function* runAgent(
     }
 
     const totals = await getTotals();
-    yield {
+    yield emit({
       type: "usage",
       model: AGENT_CONFIG.model,
       promptTokens: turnPromptTokens,
@@ -201,24 +214,29 @@ export async function* runAgent(
       turnCostUsd,
       totalCostUsd: totals.totalCostUsd,
       estimated: turnEstimated,
-    };
+    });
 
     if (iterations >= AGENT_CONFIG.maxIterations && finishReason === "tool_calls") {
       // Budget exhausted mid-task. Surfacing this rather than silently stopping
       // means it shows up in logs as the incident it is.
-      yield {
+      yield emit({
         type: "error",
         message: `The agent reached its ${AGENT_CONFIG.maxIterations}-step limit without finishing. Handing over to a human is the right move here.`,
-      };
+      });
       return;
     }
 
-    yield { type: "done", finishReason, iterations };
+    yield emit({ type: "done", finishReason, iterations });
   } catch (error) {
-    yield {
+    yield emit({
       type: "error",
       message: error instanceof Error ? error.message : "Unexpected agent failure.",
-    };
+    });
+  } finally {
+    // Runs on every exit path — normal completion, error, and the `.return()`
+    // the SSE stream issues when the client disconnects — so a customer who
+    // closes the tab mid-answer still finds the conversation where they left it.
+    await saveSession(session);
   }
 }
 

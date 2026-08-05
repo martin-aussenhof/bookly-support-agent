@@ -1,5 +1,7 @@
 import type { ChatCompletionMessageParam } from "together-ai/resources/chat/completions";
 
+import type { TranscriptItem } from "@/types/chat";
+
 /**
  * Structured working memory: the slots the agent has actually established
  * during the conversation, kept separate from the transcript.
@@ -27,6 +29,12 @@ export interface Session {
    */
   messages: ChatCompletionMessageParam[];
   facts: SessionFacts;
+  /**
+   * What the browser renders. Persisted alongside `messages` — and written in
+   * the same update — so a returning visitor sees the conversation exactly as
+   * it streamed, tool cards and costs included, rather than a reconstruction.
+   */
+  transcript: TranscriptItem[];
 }
 
 export function emptyFacts(): SessionFacts {
