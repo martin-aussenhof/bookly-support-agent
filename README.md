@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bookly Support Agent
 
-## Getting Started
+A conversational AI support agent for **Bookly**, a fictional online bookstore. It answers
+order-status questions, files returns, and handles general policy questions — and knows when
+to stop and ask, or hand over to a human.
 
-First, run the development server:
+Built with Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, and **Together AI**.
+The agent loop is hand-written: no agent framework sits between the code and the API.
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local   # add TOGETHER_API_KEY (and DATABASE_URL, optional)
+pnpm dev                     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`pnpm typecheck`, `pnpm lint`, and `pnpm build` all run clean.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `TOGETHER_API_KEY` | yes | Together AI inference |
+| `DATABASE_URL` | no | Neon Postgres, for the cost meter. Without it the meter runs in memory and resets on restart. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The `usage_events` table is created automatically on first write — a fresh Neon database
+needs no migration step. [`db/schema.sql`](db/schema.sql) is the readable version.
 
-## Learn More
+## Cost meter
 
-To learn more about Next.js, take a look at the following resources:
+The header shows **total spend across every session**, not just the current browser, because
+cost per resolved conversation is the number that decides whether a model choice survives
+production traffic. Each turn also prints its own token count and cost under the reply.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**To change prices, edit [`src/server/usage/pricing.ts`](src/server/usage/pricing.ts).** It is
+one table of `model id → USD per 1M input/output tokens`, in the same units Together quotes on
+its pricing page. To change models, set `model` in
+[`src/agent/config.ts`](src/agent/config.ts) to a key from that table — if the key is missing,
+the meter warns and prices the model at $0 rather than guessing.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Default is `openai/gpt-oss-120b` at $0.15/$0.60 per 1M tokens: reliable tool calling at a price
+that works for high-volume support traffic.
 
-## Deploy on Vercel
+One honest caveat: Together's streaming schema marks `usage` as nullable and has no
+`stream_options.include_usage`. When a stream ends without reported token counts, the loop
+falls back to a ~4-chars-per-token estimate and flags the row `estimated` — visible in the
+meter tooltip and as a `~` in the per-turn line. The meter never silently reports zero.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Try these
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The fixtures are seeded so each path is reachable from the UI:
+
+| Say this | What it exercises |
+| --- | --- |
+| "Where's my order?" | Multi-turn slot filling — the agent needs an order number *and* an email before it can look anything up |
+| "I want to return a book" with order `BK-10432` / `maya.chen@example.com` | Two-item order → the agent asks *which* book before acting |
+| "How long do refunds take?" | Grounded retrieval — answered only from the help centre |
+| Return something on `BK-09877` / `sam.okafor@example.com` | Delivered 58 days ago → policy refusal, then an offer to escalate |
+| "Can I speak to a person?" | Structured handover with a written note |
+
+Seeded orders live in [`src/server/bookly/data/orders.ts`](src/server/bookly/data/orders.ts).
+
+## Architecture
+
+```
+Browser  ──POST /api/chat──▶  Route  ──▶  runAgent()  ──▶  Together AI
+   ▲                                          │
+   └──────── SSE (AgentEvent) ────────────────┼──▶ Tool registry ──▶ Mock Bookly backend
+                                              │
+                                              └──▶ Usage ledger ───▶ Neon
+```
+
+| Path | Role |
+| --- | --- |
+| `src/agent/run.ts` | The orchestration loop. Streams text, reassembles tool calls, enforces the step budget, meters cost. |
+| `src/server/usage/pricing.ts` | **Token prices. The file to edit.** |
+| `src/server/usage/store.ts` | Neon-backed usage ledger, with an in-memory fallback. |
+| `src/agent/tools/` | One file per capability. Zod schema per tool, compiled to JSON Schema *and* used to validate what the model sends back. |
+| `src/agent/memory/` | Server-owned session state: the transcript the model sees, plus the structured facts the system trusts. |
+| `src/agent/prompts/` | System prompt, split into a frozen base and a per-turn facts block so the prefix stays stable. |
+| `src/server/bookly/` | Mock commerce API. Knows nothing about agents — swap for real HTTP calls without touching `src/agent/`. |
+| `src/components/chat/` | Transcript UI. Tool calls are rendered inline and expandable. |
+| `src/agent/events.ts` | The single `AgentEvent` union shared by the loop, the route, and the client hook. |
+
+### Three decisions worth defending
+
+**Policy lives in the backend, not the prompt.** The 30-day return window, the label fee, and
+the "this order belongs to a different customer" check are enforced in `src/server/bookly/client.ts`.
+The model asks for a return; the system decides whether it's allowed. A prompt can be argued
+with — a function signature can't.
+
+**Tools are the only source of truth.** The agent is instructed that it knows nothing about
+Bookly's policies or any customer's orders. Every factual claim has to come back from
+`lookup_order` or `search_help_center` in that same conversation, which is what makes
+"I don't know, let me get someone who does" a reachable answer instead of a hallucinated policy.
+
+**Conversation state is server-owned.** The client posts `{ sessionId, message }` and nothing
+else. Tool inputs, tool results, and the system prompt never travel to the browser as state,
+and the transcript the model reads can't be edited by the client.
+
+## Assumptions
+
+- Single fictional customer per session; no real auth. Identity is "the email matches the order",
+  which is the shape of a real verification step without the plumbing.
+- Sessions are in-memory and expire after an hour. Redis or Postgres would drop in behind the
+  three functions in `session-store.ts`.
+- Help-centre retrieval is keyword scoring, not embeddings — enough to demonstrate grounding,
+  and behind a tool contract that a vector search can replace unchanged.
+- Prices in GBP. The mock backend adds ~350ms of latency so streaming and tool timing look real.
