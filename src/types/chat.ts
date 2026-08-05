@@ -45,6 +45,9 @@ export interface UsageItem {
 export interface NoticeItem {
   kind: "notice";
   id: string;
-  tone: "error";
+  /** `info` is a calm system note (a handover); `error` is a failure. */
+  tone: "error" | "info";
   text: string;
+  /** Raw diagnostic, development only. Never shown in production. */
+  detail?: string;
 }

@@ -36,5 +36,18 @@ export type AgentEvent =
     }
   /** Turn complete — no further events for this request. */
   | { type: "done"; finishReason: string | null; iterations: number }
-  /** Unrecoverable failure; the turn is over. */
-  | { type: "error"; message: string };
+  /**
+   * Something the customer should know that is not a failure — currently an
+   * automatic handover. Separate from `error` so the UI can present it calmly
+   * rather than as a red alert.
+   */
+  | { type: "notice"; message: string }
+  /**
+   * Unrecoverable failure; the turn is over.
+   *
+   * `message` is customer-facing and must stay free of provider internals.
+   * `detail` is the raw diagnostic and is only populated outside production —
+   * it is for whoever is running the demo, never for the person asking about
+   * a book.
+   */
+  | { type: "error"; message: string; detail?: string };

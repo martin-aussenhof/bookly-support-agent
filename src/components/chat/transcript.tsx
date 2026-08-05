@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle, UserRoundCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -51,8 +52,23 @@ function Item({ item }: { item: TranscriptItem }) {
 
     case "notice":
       return (
-        <Alert variant="destructive" className="rounded-xl">
-          <AlertDescription>{item.text}</AlertDescription>
+        <Alert
+          variant={item.tone === "error" ? "destructive" : "default"}
+          className="rounded-xl"
+        >
+          {item.tone === "error" ? (
+            <AlertTriangle className="size-4" />
+          ) : (
+            <UserRoundCheck className="size-4" />
+          )}
+          <AlertDescription>
+            {item.text}
+            {item.detail && (
+              <span className="text-muted-foreground mt-1.5 block font-mono text-3xs break-all">
+                {item.detail}
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       );
   }

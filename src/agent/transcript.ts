@@ -78,10 +78,22 @@ export function applyAgentEvent(items: TranscriptItem[], event: AgentEvent): Tra
         },
       ];
 
+    case "notice":
+      return [
+        ...seal(items),
+        { kind: "notice", id: newId("note"), tone: "info", text: event.message },
+      ];
+
     case "error":
       return [
         ...seal(items),
-        { kind: "notice", id: newId("err"), tone: "error", text: event.message },
+        {
+          kind: "notice",
+          id: newId("err"),
+          tone: "error",
+          text: event.message,
+          ...(event.detail && { detail: event.detail }),
+        },
       ];
 
     case "done":

@@ -13,6 +13,7 @@ import type { AgentEvent } from "./events";
 import { loadSession, saveSession } from "./memory/session-store";
 import { buildSystemPrompt } from "./prompts/system";
 import { executeTool, getTool, toFunctionTools } from "./tools/registry";
+import type { ToolContext } from "./tools/types";
 import { together } from "./together";
 import { appendUserMessage, applyAgentEvent } from "./transcript";
 
@@ -52,6 +53,23 @@ export async function* runAgent(
     session.transcript = applyAgentEvent(session.transcript, event);
     return event;
   };
+
+  /**
+   * Shared by every tool call in the turn. `facts` is a getter rather than a
+   * snapshot so a tool that runs after another's `remember()` sees the update.
+   */
+  const toolContext: ToolContext = {
+    sessionId,
+    get facts() {
+      return session.facts;
+    },
+    remember: (patch) => {
+      session.facts = { ...session.facts, ...patch };
+    },
+  };
+
+  /** Tool names attempted this turn, for the handover note if we run out of budget. */
+  const toolsAttempted: string[] = [];
 
   let iterations = 0;
   let turnPromptTokens = 0;
@@ -172,18 +190,12 @@ export async function* runAgent(
 
       // Parallel tool calls arrive in one assistant message; run them together
       // and append every result before the next model call.
+      toolsAttempted.push(...calls.map((call) => call.name));
+
       const executions = await Promise.all(
         calls.map(async (call) => ({
           call,
-          result: await executeTool(call.name, call.arguments, {
-            sessionId,
-            facts: session.facts,
-            // Mutating the loaded session is enough — it is persisted with the
-            // rest of the turn in the `finally` below.
-            remember: (patch) => {
-              session.facts = { ...session.facts, ...patch };
-            },
-          }),
+          result: await executeTool(call.name, call.arguments, toolContext),
         })),
       );
 
@@ -217,20 +229,47 @@ export async function* runAgent(
     });
 
     if (iterations >= AGENT_CONFIG.maxIterations && finishReason === "tool_calls") {
-      // Budget exhausted mid-task. Surfacing this rather than silently stopping
-      // means it shows up in logs as the incident it is.
-      yield emit({
-        type: "error",
-        message: `The agent reached its ${AGENT_CONFIG.maxIterations}-step limit without finishing. Handing over to a human is the right move here.`,
+      // Budget exhausted mid-task. This is the one case where the agent has
+      // demonstrably failed, so it must not dead-end: escalate for real, with a
+      // note, instead of telling the customer a human "should" take over and
+      // then doing nothing about it.
+      console.warn("[agent] step budget exhausted", {
+        sessionId,
+        iterations,
+        toolsAttempted,
       });
+      yield* handOver(emit, toolContext, {
+        summary:
+          `The agent reached its ${AGENT_CONFIG.maxIterations}-step limit without finishing. ` +
+          `The customer asked: "${userMessage}". ` +
+          (toolsAttempted.length > 0
+            ? `Tools already tried: ${[...new Set(toolsAttempted)].join(", ")}. `
+            : "No tools completed. ") +
+          "Please take over from the transcript.",
+      });
+
+      const message =
+        "I wasn't able to finish this one myself, so I've passed it to a colleague " +
+        "along with everything I've tried. They'll pick it up from here.";
+      // Keep the model's own history consistent with what the customer was told.
+      session.messages.push({ role: "assistant", content: message });
+      yield emit({ type: "notice", message });
       return;
     }
 
     yield emit({ type: "done", finishReason, iterations });
   } catch (error) {
+    // The customer gets a plain apology; the provider's wording — auth failures,
+    // rate-limit text, socket errors — stays in the logs where it belongs.
+    console.error("[agent] turn failed", { sessionId, iterations, error });
     yield emit({
       type: "error",
-      message: error instanceof Error ? error.message : "Unexpected agent failure.",
+      message:
+        "Something went wrong on our side and I couldn't finish that reply. " +
+        "Please try again — if it keeps happening, ask for a human and I'll hand you over.",
+      ...(process.env.NODE_ENV !== "production" && {
+        detail: error instanceof Error ? error.message : String(error),
+      }),
     });
   } finally {
     // Runs on every exit path — normal completion, error, and the `.return()`
@@ -238,6 +277,41 @@ export async function* runAgent(
     // closes the tab mid-answer still finds the conversation where they left it.
     await saveSession(session);
   }
+}
+
+/**
+ * Escalates on the agent's behalf, emitting the same `tool_call` /`tool_result`
+ * pair a model-initiated escalation would. The handover therefore appears in
+ * the transcript as an ordinary tool card, and lands in the same place — with
+ * the same reason code — as one the model asked for, so escalation counts stay
+ * honest whether the agent chose to hand over or was forced to.
+ */
+async function* handOver(
+  emit: (event: AgentEvent) => AgentEvent,
+  ctx: ToolContext,
+  input: { summary: string },
+): AsyncGenerator<AgentEvent> {
+  const id = `auto_${crypto.randomUUID().slice(0, 8)}`;
+  const args = { reason: "repeated_failure" as const, summary: input.summary };
+
+  yield emit({
+    type: "tool_call",
+    id,
+    name: "escalate_to_human",
+    input: args,
+    mutating: true,
+  });
+
+  const result = await executeTool("escalate_to_human", JSON.stringify(args), ctx);
+
+  yield emit({
+    type: "tool_result",
+    id,
+    name: "escalate_to_human",
+    summary: result.summary,
+    isError: result.isError ?? false,
+    data: result.data,
+  });
 }
 
 function safeParse(json: string): unknown {

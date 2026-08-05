@@ -246,6 +246,31 @@ phrasing that talks past it, because the model never receives the data.
 `BK-10233` (marked delivered but never arrived — carrier-investigation policy), and
 `BK-10702` (out for delivery, three items, £57.47 — a denser tracking reply).
 
+## When it can't help
+
+Four levels, in order: **ask** rather than guess when information is missing; **say it can't
+confirm** when retrieval comes back empty; **explain the refusal** when policy says no; and
+**escalate** with a handover note written for the colleague, not the customer. Underneath all
+of it, tool failures — malformed arguments, exceptions, unknown tools — come back as tool
+*results* carrying a hint, so the model can retry or ask rather than the turn dying.
+
+Two paths are handled in code rather than left to the model:
+
+- **Step budget exhausted.** If the agent burns all 8 tool round-trips without finishing, it
+  calls `escalate_to_human` itself with `reason: "repeated_failure"` and a note listing what
+  it already tried. The one case where the agent has demonstrably failed is not allowed to
+  dead-end — it lands in the same queue, with the same reason code, as an escalation the
+  model chose, so escalation counts stay honest either way.
+- **Provider or network failure.** The customer gets a plain apology. The provider's own
+  wording — auth failures, rate-limit text, socket errors — goes to the server log, and is
+  attached to the message only outside production so whoever is running the demo can see it.
+  Verified against a real Together 401: the customer-facing string contains no status code,
+  no provider name, and no key material.
+
+Still a mock: `escalate_to_human` invents a ticket id and quotes a hardcoded 6-minute wait.
+Nothing is queued anywhere. Persisting escalations next to `usage_events` would make ticket
+ids real and turn escalation reasons into the chart that shows where the agent's ceiling is.
+
 ## Architecture
 
 ```
