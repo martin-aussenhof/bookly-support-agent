@@ -30,8 +30,8 @@ interface PendingToolCall {
  * The orchestration loop.
  *
  * One user message in, a stream of `AgentEvent`s out. Everything the agent does
- * — streaming text, calling tools, deciding it is finished, accounting for what
- * it spent — happens here, in a loop we own, rather than inside a framework.
+ * — answering, calling tools, deciding it is finished, accounting for what it
+ * spent — happens here, in a loop we own, rather than inside a framework.
  * That is deliberate: the loop is where guardrails, budgets, and observability
  * naturally live, so it should be the most readable file in the project.
  */
@@ -105,6 +105,7 @@ export async function* runAgent(
       // Keeps the model's private reasoning channel out of the customer's view
       // and out of the stored transcript.
       const visible = new VisibleTextFilter();
+      // Held rather than streamed: see the note above the emit below.
       const toolCalls: PendingToolCall[] = [];
       let reportedPromptTokens: number | null = null;
       let reportedCompletionTokens: number | null = null;
@@ -115,13 +116,7 @@ export async function* runAgent(
         if (choice?.finish_reason) finishReason = choice.finish_reason;
 
         const content = choice?.delta?.content;
-        if (content) {
-          const shown = visible.push(content);
-          if (shown) {
-            text += shown;
-            yield emit({ type: "text_delta", text: shown });
-          }
-        }
+        if (content) text += visible.push(content);
 
         // Tool calls stream in fragments keyed by index: the name arrives once,
         // the JSON arguments arrive a few characters at a time.
@@ -141,13 +136,33 @@ export async function* runAgent(
         }
       }
 
-      const tail = visible.flush();
-      if (tail) {
-        text += tail;
-        yield emit({ type: "text_delta", text: tail });
-      }
+      text += visible.flush();
 
       const calls = toolCalls.filter(Boolean);
+
+      /**
+       * Only an iteration that commits to an answer is allowed to speak.
+       *
+       * A model call that ends in tool calls often writes prose first, and that
+       * prose is by definition ungrounded — it was composed before the tool it
+       * is about to call returned anything. In practice it is not hedging but a
+       * confident wrong answer: an invented order total and tracking number,
+       * corrected two seconds later by the real one. Showing it and then
+       * contradicting it is worse than saying nothing.
+       *
+       * So the text is held until the model stops calling tools. This is why
+       * the whole reply lands at once rather than token by token: content
+       * arrives *before* tool-call deltas, so there is no point at which we
+       * could stream it and still take it back without the customer reading it
+       * first. Tool cards stream throughout, so the wait is not silent.
+       *
+       * Nothing needs deleting when text is withheld — `message_start` opened
+       * an empty message, and the transcript reducer drops assistant turns that
+       * produced no text as soon as the next card seals them.
+       */
+      if (calls.length === 0 && text) {
+        yield emit({ type: "text_delta", text });
+      }
 
       // --- cost accounting for this model call -------------------------------
       const estimated = reportedPromptTokens === null || reportedCompletionTokens === null;

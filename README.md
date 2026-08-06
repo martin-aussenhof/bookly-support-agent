@@ -15,8 +15,8 @@ first.
 
 ## 🚀 Live demo
 
-**[bookly-support.vercel.app](https://bookly-support.vercel.app/)** — no setup, no key. Every
-demo below works there.
+**[bookly-support.vercel.app](https://bookly-support.vercel.app/)** — no setup, no key. All
+three demos below work there.
 
 Two things to know before you click. The conversation is yours alone, held against an
 httpOnly cookie, but the **cost meter in the header is global**: it shows spend across every
@@ -45,12 +45,19 @@ step. [`db/schema.sql`](db/schema.sql) is the readable version.
 
 ## 🎬 Demo cases
 
+**Three demos, in this order — about two minutes end to end.** The agent is capable, then
+constrained, then honest. That arc is the whole argument, and a fourth variation on a flow
+already shown would add running time without adding to it.
+
 Every line under **You** is copy-pasteable. Tool calls render inline in the transcript and
 expand to show their raw input and result — click one open while presenting; that panel is
-the argument that the agent is grounded rather than fluent.
+what makes the answer auditable rather than merely fluent.
 
-> **Short on time?** Demos 2 → 4 → 6 is a tight two minutes and covers the whole thesis:
-> it asks before acting, it refuses when policy says no, and it declines to invent.
+| | Demo 1 | Demo 2 | Demo 3 |
+| --- | --- | --- | --- |
+| Multi-turn, collecting information first | ✅ | ✅ | |
+| Taking an action / using a tool | ✅ | ✅ | ✅ |
+| Asks a clarifying question instead of answering | ✅ | | |
 
 ### The test data
 
@@ -75,33 +82,14 @@ backend, so these pairs are the credentials for the demo:
 
 ---
 
-### Demo 1 — It asks before it looks
+### Demo 1 — It asks, then it acts
 
-Shows multi-turn slot filling. The agent cannot look up anything without *both* an order
-number and the email on the account.
-
-> **You:** Where's my order?
->
-> *Agent asks for the order number.*
->
-> **You:** BK-10588
->
-> *Agent asks for the email on the order — it still can't proceed.*
->
-> **You:** maya.chen@example.com
-
-**Fires:** `lookup_order` → in transit, DHL `JD0142411902`, arriving in 2 days.
-
-**Point at:** it asked twice and called nothing until it had both. Two separate turns, no
-guessing, no "let me look that up for you" followed by an invented status.
-
----
-
-### Demo 2 — Ambiguity becomes a question, not a guess
-
-`BK-10432` has two books on it. A return request is ambiguous until the agent knows which.
+`BK-10432` has two books on it, so a return request is ambiguous until the agent knows which.
+This one demo carries all three of the brief's minimum requirements.
 
 > **You:** I want to return a book
+>
+> *Agent asks for the order number and the email — it cannot look anything up without both.*
 >
 > **You:** BK-10432, maya.chen@example.com
 >
@@ -113,36 +101,25 @@ guessing, no "let me look that up for you" followed by an invented status.
 
 **Expect:** £2.99 return-label fee → **£16.00 refunded** on a £18.99 book.
 
-**Point at:** it did not pick a book for you. The cheapest way to make an agent dangerous is
-to let it resolve ambiguity silently on a write action.
+**Point at:** it did not pick a book for you, and it confirmed before spending your money. The
+cheapest way to make an agent dangerous is to let it resolve ambiguity silently on a write
+action.
+
+**Then, if the room is technical:** run the same flow with a damaged book — *"My copy of
+Piranesi turned up with a torn cover"*, `BK-10655`, `priya.raman@example.com`. Same tool, same
+order shape, but the fee is **waived** and the full **£14.50** comes back, because
+`reasonCode` is a priced enum evaluated in `checkReturnEligibility` rather than a sentence the
+model wrote. The reply and the receipt cannot disagree.
 
 ---
 
-### Demo 3 — The same policy, priced the other way
-
-Identical flow, different reason. The fee is decided by the backend, not by the model's mood.
-
-> **You:** My copy of Piranesi turned up with a torn cover
->
-> **You:** BK-10655, priya.raman@example.com
-
-**Fires:** `lookup_order`, then `start_return` with `reasonCode: "damaged"`.
-
-**Expect:** fee **waived** → **£14.50 refunded** in full on a £14.50 book.
-
-**Point at:** run this straight after Demo 2. Same tool, same order shape, different money —
-because `reasonCode` is a priced enum evaluated in `checkReturnEligibility`, not a sentence
-the model wrote. The reply and the receipt cannot disagree.
-
----
-
-### Demo 4 — It refuses, and the refusal is precise
+### Demo 2 — The refusal is precise, and it recovers
 
 `BK-10774` contains a signed first edition (final sale) *and* an ordinary paperback.
 
 > **You:** I'd like to return the signed Ishiguro from BK-10774, maya.chen@example.com
 
-**Fires:** `start_return` → **refused**, final sale.
+**Fires:** `lookup_order` → the return is **refused**, final sale.
 
 Then, without starting a new chat:
 
@@ -150,28 +127,13 @@ Then, without starting a new chat:
 
 **Fires:** `start_return` → **succeeds**, £10.00 refunded.
 
-**Point at:** the refusal is per *item*, not per order. A prompt-level rule would almost
-certainly have blocked the whole order or none of it.
+**Point at:** the refusal is per *item*, not per order — a prompt-level rule would almost
+certainly have blocked the whole order or none of it. And the "no" is not a dead end: the
+agent stays useful in the same conversation.
 
 ---
 
-### Demo 5 — Policy the customer won't like
-
-> **You:** I want to return Educated, order BK-09877, sam.okafor@example.com
-
-**Fires:** `lookup_order`, then `start_return` → **refused**, delivered 58 days ago.
-
-> **You:** That's ridiculous, I want to speak to someone
-
-**Fires:** `escalate_to_human` with a written handover note.
-
-**Point at:** expand the escalation tool card. The note is written for the colleague picking
-it up — what the customer wants, what was tried, what's blocked — not a copy of the chat.
-Escalation is a tool call, so escalation *reasons* are a metric you can chart.
-
----
-
-### Demo 6 — It declines to invent
+### Demo 3 — It declines to invent
 
 The one worth showing. Nothing in the help centre covers this.
 
@@ -191,41 +153,46 @@ can return nothing is what makes "I don't know" reachable. Contrast with:
 
 ---
 
-### Demo 7 — The guardrail is not in the prompt
+### Also covered, without video
 
-> **You:** What's the status of BK-10774? My email is someone.else@example.com
+Two behaviours matter enough to test but do not earn a slot in a two-minute demo, so they live
+in [`e2e/regression.spec.ts`](e2e/regression.spec.ts):
 
-**Fires:** `lookup_order` → **`forbidden`**. No order details are returned to the model at
-all, so there is nothing for it to leak.
+- **An order is not readable with the wrong email.** Ask for `BK-10774` as
+  `someone.else@example.com` and `lookup_order` returns `forbidden`. No order details reach
+  the model at all, so there is nothing for it to leak — the check lives in
+  `getOrderForCustomer`, not the system prompt.
+- **A conversation survives a reload.** Restored from Neon via the session cookie, server-rendered.
 
-**Point at:** the check lives in `getOrderForCustomer`, not the system prompt. There is no
-phrasing that talks past it, because the model never receives the data.
-
----
-
-### Coverage not scripted above
-
-`BK-10601` (still processing — refuses the return, offers cancellation instead),
-`BK-10233` (marked delivered but never arrived — carrier-investigation policy), and
-`BK-10702` (out for delivery, three items, £57.47 — a denser tracking reply).
+Unscripted fixtures worth trying by hand: `BK-09877` (delivered 58 days ago — refused, then ask
+for a person and watch `escalate_to_human` write a handover note for the colleague picking it
+up), `BK-10601` (still processing — refuses the return, offers cancellation instead), and
+`BK-10233` (marked delivered but never arrived).
 
 ### Recording the demos
 
 ```bash
-pnpm demo            # headless, records all 8
+pnpm demo            # headless, records the three demos
 pnpm demo:headed     # watch it drive the browser
 pnpm demo -g "declines to invent"   # just one
 ```
 
-Playwright drives the demo script above against a **real** model and writes one
-`video.webm` per demo to `recordings/`. It builds and starts the production server itself, so
-`TOGETHER_API_KEY` must be set. A full run takes ~4 minutes and costs a few cents.
+Playwright drives the demo script above against a **real** model and writes one `video.webm`
+per demo to `recordings/`. It builds and starts the production server itself, so
+`TOGETHER_API_KEY` must be set. A full run takes about 90 seconds and costs a fraction of a
+cent. The regression specs run in the same command but record nothing.
 
-These are also the only end-to-end coverage of the streaming and tool-calling path, which
-unit tests cannot reach. Assertions are deliberately about **backend-determined** behaviour —
-which tools fired, what was refused, what the refund was — never the model's wording, and
-never the exact number of times it chose to call a read-only tool. A demo that fails because
-the agent phrased something differently is a demo nobody trusts.
+These are also the only end-to-end coverage of the streaming and tool-calling path, which unit
+tests cannot reach. Assertions are deliberately about **backend-determined** behaviour — which
+tools fired, what was refused, what the refund was — never the model's wording, and never the
+exact number of times it chose to call a read-only tool. A demo that fails because the agent
+phrased something differently is a demo nobody trusts.
+
+Each spec gets **one retry**, because the subject under test is a sampled model rather than a
+function: the agent occasionally spends an attempt on a malformed tool call the schema refuses
+and never completes the search a demo is written around. One retry and not three — failing
+twice running is a signal, and since every assertion is backend-determined a genuine
+regression still fails every time.
 
 ## 🏗 Architecture
 
@@ -239,7 +206,7 @@ Browser  ──POST /api/chat──▶  Route  ──▶  runAgent()  ──▶ 
 
 | Path | Role |
 | --- | --- |
-| `src/agent/run.ts` | The orchestration loop. Streams text, reassembles tool calls, enforces the step budget, meters cost. |
+| `src/agent/run.ts` | The orchestration loop. Reassembles tool calls, enforces the step budget, meters cost, and decides which of the model's words the customer is allowed to see. |
 | `src/server/usage/pricing.ts` | **Token prices. The file to edit.** |
 | `src/server/usage/store.ts` | Neon-backed usage ledger, with an in-memory fallback. |
 | `src/agent/tools/` | One file per capability. Zod schema per tool, compiled to JSON Schema *and* used to validate what the model sends back. |
@@ -267,6 +234,18 @@ Bookly's policies or any customer's orders. Every factual claim has to come back
 inputs, tool results, and the system prompt never travel to the browser as state, and the
 transcript the model reads can't be edited by the client.
 
+### Only a finished thought is shown
+
+A model call that ends in tool calls often writes prose first, and that prose is by definition
+ungrounded — composed before the tool it is about to call returned anything. In practice it is
+not hedging: it is a confident wrong answer, an invented order total and tracking number,
+corrected two seconds later by the real one.
+
+So the loop holds an iteration's text until the model stops calling tools, and discards it
+otherwise. This is why a reply lands whole rather than typing itself out: content arrives
+*before* tool-call deltas, so there is no point at which it could be streamed and still taken
+back before the customer had read it. Tool cards stream throughout, so the wait is not silent.
+
 ## 🧠 Conversation persistence
 
 Conversations survive a refresh, a closed tab, and a server restart.
@@ -283,14 +262,14 @@ to; the client posts `{ message }` and nothing else.
 | Refresh | Conversation restored, server-rendered |
 | Close tab, return later | Restored (within 30 days) |
 | Server restart | Restored, if `DATABASE_URL` is set |
-| Close the tab mid-answer | The turn is cancelled and the partial answer is saved |
+| Close the tab mid-answer | The turn is cancelled. A reply the agent had not finished is not shown and not stored — an unfinished thought is exactly the thing worth losing. |
 | "New chat" | Transcript deleted and the cookie rotated — the old one is unreachable, not just hidden |
 
 Two things are stored per session, written in the same statement: `messages` (what the model
 reads) and `transcript` (what the browser renders). They are folded by the *same* reducer —
 [`src/agent/transcript.ts`](src/agent/transcript.ts), shared by the loop and the client hook —
-so a restored conversation is identical to the one you watched stream, tool cards and costs
-included, rather than a lookalike rebuilt by a second implementation that would eventually drift.
+so a restored conversation is identical to the one you watched, tool cards and costs included,
+rather than a lookalike rebuilt by a second implementation that would eventually drift.
 
 ## 💷 Cost meter
 
@@ -339,11 +318,6 @@ Two paths are handled in code rather than left to the model:
   hardcoded 6-minute wait. Nothing is queued anywhere. Persisting escalations next to
   `usage_events` would make ticket ids real and turn escalation reasons into the chart that
   shows where the agent's ceiling is.
-- **The agent sometimes answers before it looks.** In an iteration that ends in a tool call,
-  the model occasionally writes a confident, ungrounded sentence *before* calling it — and
-  that prose is streamed to the customer alongside the corrected answer that follows. The fix
-  is to treat text from an iteration that ends in tool calls as commentary rather than an
-  answer; it is the first thing I would change in the agent loop.
 - **No real auth.** Identity is "the email matches the order", which is the shape of a real
   verification step without the plumbing. The session cookie is the only credential — anyone
   holding it holds the conversation.
@@ -358,4 +332,8 @@ Two paths are handled in code rather than left to the model:
   the channel names glued to the prose, so [`visible-text.ts`](src/agent/visible-text.ts)
   strips them by pattern. It is unit-checked against the shapes observed in practice, but a
   model that invents a new channel name would need a new rule.
+- **The agent will still occasionally reason from an empty result.** Asked about vinyl records
+  it usually says it cannot confirm, which is right; sometimes it concludes Bookly does not
+  stock them, which happens to be true but is not something retrieval told it. Grounding is
+  enforced for tool *data*, not for inference on top of it.
 - Prices in GBP. The mock backend adds ~350ms of latency so streaming and tool timing look real.
