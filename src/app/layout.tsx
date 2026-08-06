@@ -1,36 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 /**
- * Three faces, three jobs.
+ * One family, two widths.
  *
- * Instrument Sans carries the interface: a grotesque with slightly narrow
- * proportions and real personality in its lowercase, which keeps dense UI
- * readable without landing on the Inter/Roboto default everything else uses.
- * Instrument Serif is its companion face — used only for the wordmark and the
- * empty-state headline, where a moment of editorial voice suits a bookshop.
- * JetBrains Mono handles tool payloads and money, where tabular figures and an
- * unambiguous 0/O matter more than character.
+ * Geist carries everything — interface, headings, and the wordmark. It is a
+ * neutral grotesque drawn for screens, with the tight apertures and even colour
+ * that keep dense UI legible, and it takes optical tracking at heading sizes
+ * without falling apart. Deliberately a single family: the earlier build paired
+ * a serif display face against the UI sans, which read as editorial. An
+ * engineered product should look like it was set by one hand.
+ *
+ * Geist Mono handles tool payloads and money, where tabular figures and an
+ * unambiguous 0/O matter more than character. Same skeleton as the sans, so
+ * a JSON payload sits inside the interface instead of interrupting it.
  */
-const instrumentSans = Instrument_Sans({
-  variable: "--font-instrument-sans",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
   display: "swap",
 });
 
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  weight: "400",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
 });
@@ -42,8 +38,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1917" },
+    { media: "(prefers-color-scheme: light)", color: "#fafafb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0e11" },
   ],
 };
 
@@ -53,7 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       // next-themes writes the class before paint; React must not object to it.
       suppressHydrationWarning
-      className={`${instrumentSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <ThemeProvider

@@ -45,7 +45,7 @@ export function Deck() {
   return (
     <div className="app-ambient flex min-h-dvh flex-col">
       <header className="flex items-center gap-3 px-4 py-3 sm:px-8">
-        <span className="font-display text-lg tracking-tight">Bookly</span>
+        <span className="text-lg font-semibold tracking-[-0.03em]">Bookly</span>
         <span className="text-muted-foreground text-2xs font-medium tracking-widest uppercase">
           Solutions Engineering
         </span>
@@ -62,7 +62,7 @@ export function Deck() {
           <p className="text-primary text-2xs font-semibold tracking-widest uppercase">
             {slide.kicker}
           </p>
-          <h1 className="font-display mt-3 text-3xl leading-[1.1] tracking-tight text-balance sm:text-4xl lg:text-5xl">
+          <h1 className="mt-3 text-3xl leading-[1.08] font-semibold text-balance sm:text-4xl lg:text-5xl">
             {slide.title}
           </h1>
           <div className="mt-8">{slide.body}</div>

@@ -138,7 +138,7 @@ function Wordmark() {
 
       <div className="min-w-0 leading-none">
         <div className="flex items-baseline gap-1.5">
-          <span className="font-display text-lg leading-none tracking-tight sm:text-xl">
+          <span className="text-lg leading-none font-semibold tracking-[-0.03em] sm:text-xl">
             Bookly
           </span>
           <span className="text-muted-foreground text-2xs font-medium tracking-[0.14em] uppercase">

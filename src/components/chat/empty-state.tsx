@@ -38,9 +38,7 @@ const SUGGESTIONS: { icon: LucideIcon; label: string; hint: string; prompt: stri
 export function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
   return (
     <div className="flex flex-col items-center py-10 text-center sm:py-16">
-      <h2 className="font-display text-3xl tracking-tight text-balance sm:text-4xl">
-        How can I help?
-      </h2>
+      <h2 className="text-3xl font-semibold text-balance sm:text-4xl">How can I help?</h2>
       <p className="text-muted-foreground mt-3 max-w-md text-sm text-pretty sm:text-[0.9375rem]">
         I can check an order, start a return, or answer questions about shipping and policies.
         I&rsquo;ll ask before I do anything that costs you money.
