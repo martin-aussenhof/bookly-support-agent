@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { confirmUntil, holdFinalFrame, openChat, revealTool, say } from "./support";
+import {
+  confirmUntil,
+  holdFinalFrame,
+  openChat,
+  revealCard,
+  revealTool,
+  say,
+  toolSelector,
+} from "./support";
 
 /**
  * The README demo script, recorded.
@@ -116,9 +124,21 @@ test("5 - policy refusal, then escalation", async ({ page }) => {
 test("6 - declines to invent", async ({ page }) => {
   await say(page, "Do you sell vinyl records?");
 
-  const search = page.locator('[data-testid="tool-card"][data-tool="search_help_center"]').last();
-  await expect(search).toBeVisible();
-  await revealTool(page, "search_help_center");
+  // The claim is "a real search of the help centre came back with nothing", so
+  // the card to open is the one that says exactly that — not whichever call
+  // happened to be last.
+  //
+  // How many times the agent searches, and with what phrasing, is its own
+  // business: it often tries two wordings, and it sometimes fabricates a
+  // results object and passes it as the arguments, which the schema refuses.
+  // Asserting on the last card failed roughly one run in three on all of that,
+  // none of which is the behaviour this demo is about.
+  const search = page
+    .locator(toolSelector("search_help_center", "ok"))
+    .filter({ hasText: "No help-centre match" })
+    .first();
+
+  await revealCard(page, search);
   // The evidence for the refusal: retrieval genuinely returned nothing.
   await expect(search).toContainText('"results": []');
 

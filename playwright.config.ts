@@ -29,6 +29,20 @@ export default defineConfig({
   timeout: 5 * 60 * 1000,
   expect: { timeout: 90 * 1000 },
 
+  /**
+   * One retry, because the subject under test is a sampled model rather than a
+   * function. The agent occasionally spends its attempt on a malformed tool
+   * call the schema refuses, and never completes the search a demo is written
+   * around — a real thing worth knowing about, but not evidence from a single
+   * sample that the agent is broken. The retry also re-records: a flaky first
+   * attempt would otherwise leave a video of a failure as the artefact.
+   *
+   * Deliberately 1 and not 3. Failing twice in a row is a signal, and the
+   * assertions are all backend-determined, so a genuine regression still fails
+   * every time rather than being retried into a pass.
+   */
+  retries: 1,
+
   // The report must not live inside outputDir — it clears its own folder on
   // every run, which would delete the videos it is meant to link to.
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],

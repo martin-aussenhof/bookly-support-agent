@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Helpers shared by the demo recordings.
@@ -68,10 +68,26 @@ export async function confirmUntil(page: Page, selector: string, reply: string, 
 
 /** Opens a tool card so the recording shows the evidence behind an answer. */
 export async function revealTool(page: Page, name: string) {
-  const card = page.locator(`[data-testid="tool-card"][data-tool="${name}"]`).last();
+  await revealCard(page, page.locator(toolSelector(name)).last());
+}
+
+/** Opens one specific card, when which card matters. */
+export async function revealCard(page: Page, card: Locator) {
   await expect(card).toBeVisible();
   await card.getByRole("button").first().click();
   await page.waitForTimeout(1600);
+}
+
+/**
+ * `status` narrows to a successful or failed call. That matters when the model
+ * makes a call the schema rejects: the refusal is its own card, and it says
+ * nothing about what the underlying system actually returned.
+ */
+export function toolSelector(name: string, status?: "ok" | "error") {
+  return (
+    `[data-testid="tool-card"][data-tool="${name}"]` +
+    (status ? `[data-status="${status}"]` : "")
+  );
 }
 
 /** Scrolls the transcript to the bottom and holds, for a clean final frame. */
