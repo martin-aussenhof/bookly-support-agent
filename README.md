@@ -7,6 +7,11 @@ to stop and ask, or hand over to a human.
 Built with Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, and **Together AI**.
 The agent loop is hand-written: no agent framework sits between the code and the API.
 
+**Pitch deck: [`/deck`](http://localhost:3000/deck)** — five slides on the thesis, the
+architecture, the decisions and their tradeoffs, and what I would change first. Unlisted:
+nothing in the app links to it and it is `noindex`, but this repo is public, so treat it as
+unlisted rather than secret.
+
 ## Running it
 
 ```bash
