@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getOrderForCustomer } from "@/server/bookly/client";
 import { BooklyError } from "@/server/bookly/types";
+import { gbp, plainDate, plainStatus } from "./format";
 import { defineTool } from "./types";
 
 const schema = z.object({
@@ -37,15 +38,25 @@ export const lookupOrder = defineTool({
       });
 
       return {
-        summary: `Found order ${order.id} — ${order.status.replace(/_/g, " ")}`,
+        summary: `Found order ${order.id} — ${plainStatus(order.status)}`,
         data: {
           id: order.id,
           status: order.status,
+          statusText: plainStatus(order.status),
           placedAt: order.placedAt,
+          placedOn: plainDate(order.placedAt),
           customerName: order.customerName,
           totalCents: order.totalCents,
-          items: order.items,
-          shipment: order.shipment,
+          total: gbp(order.totalCents),
+          items: order.items.map((item) => ({
+            ...item,
+            unitPrice: gbp(item.unitPriceCents),
+          })),
+          shipment: order.shipment && {
+            ...order.shipment,
+            estimatedDeliveryOn: plainDate(order.shipment.estimatedDelivery),
+            deliveredOn: plainDate(order.shipment.deliveredAt),
+          },
         },
       };
     } catch (error) {

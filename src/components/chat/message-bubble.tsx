@@ -1,5 +1,37 @@
+import type { ReactNode } from "react";
+
 import { cn } from "@/lib/utils";
 import type { MessageItem } from "@/types/chat";
+
+/**
+ * Renders the `**emphasis**` models reach for whatever the prompt says.
+ *
+ * The agent is told the chat renders nothing, and it still bolds order numbers
+ * and delivery dates — that instinct is right, and fighting it with more prompt
+ * text costs behaviour elsewhere. So the transcript honours the two markers
+ * models actually use and drops the rest.
+ *
+ * Deliberately not a markdown library, and deliberately not HTML: this splits
+ * the string and returns elements, so there is no parser to keep up with and no
+ * path by which model output could become markup.
+ */
+const EMPHASIS = /(\*\*[^*\n]+\*\*|(?<![*\w])\*[^*\n]+\*(?!\w))/g;
+
+function formatted(text: string): ReactNode[] {
+  return text.split(EMPHASIS).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return (
+        <strong key={index} className="font-semibold">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+}
 
 /**
  * Asymmetric by design.
@@ -37,7 +69,7 @@ export function MessageBubble({ message }: { message: MessageItem }) {
           "text-foreground/90",
         )}
       >
-        {message.text}
+        {formatted(message.text)}
         {message.streaming && (
           <span
             className="bg-primary ml-1 inline-block h-4 w-0.75 translate-y-0.5 animate-pulse rounded-full"

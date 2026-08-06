@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { checkReturnEligibility, createReturn, getOrderForCustomer } from "@/server/bookly/client";
 import { BooklyError } from "@/server/bookly/types";
+import { gbp, plainStatus } from "./format";
 import { defineTool } from "./types";
 
 const schema = z.object({
@@ -77,12 +78,15 @@ export const startReturn = defineTool({
       });
 
       return {
-        summary: `Return ${request.id} created — £${(request.refundCents / 100).toFixed(2)} refund`,
+        summary: `Return ${request.id} created — ${gbp(request.refundCents)} refund`,
         data: {
           returnId: request.id,
           status: request.status,
+          statusText: plainStatus(request.status),
           refundCents: request.refundCents,
+          refund: gbp(request.refundCents),
           labelFeeCents: eligibility.feeCents,
+          labelFee: gbp(eligibility.feeCents),
           labelFeeWaived: eligibility.feeCents === 0,
           nextSteps:
             "A prepaid label has been emailed to the customer. The refund is issued " +
