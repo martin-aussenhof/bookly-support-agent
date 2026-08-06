@@ -107,18 +107,31 @@ function Wordmark() {
         className="from-primary to-primary/75 text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br shadow-sm sm:size-9"
         aria-hidden
       >
-        {/* A stacked-spine mark reads as "books" at 16px, where a glyph would not. */}
-        <svg viewBox="0 0 24 24" fill="none" className="size-4 sm:size-[1.1rem]">
-          <path
-            d="M4 5.5A1.5 1.5 0 0 1 5.5 4h2A1.5 1.5 0 0 1 9 5.5v13A1.5 1.5 0 0 1 7.5 20h-2A1.5 1.5 0 0 1 4 18.5v-13ZM11 5.5A1.5 1.5 0 0 1 12.5 4h1A1.5 1.5 0 0 1 15 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5v-13Z"
+        {/*
+          Identical geometry to `src/app/icon.svg`, minus the tile — the header
+          already provides that. Same viewBox on purpose: the tab and the header
+          should show one mark, not two that merely rhyme.
+        */}
+        <svg viewBox="0 0 32 32" fill="none" className="size-4 sm:size-[1.15rem]">
+          <rect x="5.4" y="7.5" width="6" height="17" rx="1.8" fill="currentColor" />
+          <rect
+            x="13.4"
+            y="7.5"
+            width="6"
+            height="17"
+            rx="1.8"
             fill="currentColor"
+            opacity="0.95"
           />
-          <path
-            d="m17.4 6.6 1.9-.5a1.5 1.5 0 0 1 1.84 1.06l2.6 9.66"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            opacity="0.65"
+          <rect
+            x="21.2"
+            y="8"
+            width="5.4"
+            height="16"
+            rx="1.7"
+            fill="currentColor"
+            opacity="0.8"
+            transform="rotate(9 23.9 16)"
           />
         </svg>
       </div>

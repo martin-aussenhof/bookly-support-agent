@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Bookly">
+  <!--
+    Three book spines on the brand's ink-green tile.
+
+    Geometry is drawn for 16px first, not scaled down from a large mark. At a
+    16px tab that is 8 device pixels of usable width, so the spines are 6 units
+    wide with 2-unit gaps — at render size, 3px bars separated by a full pixel.
+    Narrower gaps merge into a white blob, which is exactly what the first
+    version of this did.
+
+    A filled tile rather than a bare glyph: an outline mark dissolves into the
+    browser chrome, and the green reads as "Bookly" on light and dark tab bars
+    alike. The leaning third spine is solid, not a hairline — a 1px diagonal is
+    the first thing to vanish when an icon is downscaled.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f6a4f" />
+      <stop offset="1" stop-color="#123f2e" />
+    </linearGradient>
+  </defs>
+
+  <rect width="32" height="32" rx="7.5" fill="url(#tile)" />
+
+  <rect x="5.4" y="7.5" width="6" height="17" rx="1.8" fill="#fff" />
+  <rect x="13.4" y="7.5" width="6" height="17" rx="1.8" fill="#fff" opacity=".95" />
+  <rect
+    x="21.2"
+    y="8"
+    width="5.4"
+    height="16"
+    rx="1.7"
+    fill="#fff"
+    opacity=".8"
+    transform="rotate(9 23.9 16)"
+  />
+</svg>
