@@ -64,6 +64,7 @@ export function Composer({ disabled, onSend }: ComposerProps) {
             // it must not draw its own.
             className="min-h-0 resize-none border-0 bg-transparent px-2 py-2 text-[0.9375rem] shadow-none focus-visible:ring-0 dark:bg-transparent"
             aria-label="Message Bookly support"
+            data-testid="composer-input"
           />
 
           <Button
@@ -72,6 +73,7 @@ export function Composer({ disabled, onSend }: ComposerProps) {
             className="size-9 shrink-0 rounded-lg transition-transform active:scale-95"
             disabled={!canSend}
             aria-label="Send message"
+            data-testid="composer-send"
           >
             <ArrowUp className="size-4" />
           </Button>

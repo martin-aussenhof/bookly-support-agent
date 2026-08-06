@@ -14,7 +14,10 @@ export function MessageBubble({ message }: { message: MessageItem }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end pt-2">
-        <div className="bg-primary text-primary-foreground max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[0.9375rem] leading-relaxed wrap-break-word shadow-sm sm:max-w-[78%]">
+        <div
+          data-testid="message-user"
+          className="bg-primary text-primary-foreground max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-[0.9375rem] leading-relaxed wrap-break-word shadow-sm sm:max-w-[78%]"
+        >
           {message.text}
         </div>
       </div>
@@ -28,6 +31,7 @@ export function MessageBubble({ message }: { message: MessageItem }) {
         aria-hidden
       />
       <div
+        data-testid="message-assistant"
         className={cn(
           "min-w-0 flex-1 text-[0.9375rem] leading-[1.7] whitespace-pre-wrap",
           "text-foreground/90",

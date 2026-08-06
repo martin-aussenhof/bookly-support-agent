@@ -41,7 +41,10 @@ function Item({ item }: { item: TranscriptItem }) {
 
     case "usage":
       return (
-        <p className="text-muted-foreground/70 font-mono text-3xs tracking-tight sm:pl-4">
+        <p
+          data-testid="turn-usage"
+          className="text-muted-foreground/70 font-mono text-3xs tracking-tight sm:pl-4"
+        >
           {item.estimated && "~"}
           {item.promptTokens.toLocaleString()} in · {item.completionTokens.toLocaleString()} out
           {" · "}
@@ -53,6 +56,8 @@ function Item({ item }: { item: TranscriptItem }) {
     case "notice":
       return (
         <Alert
+          data-testid="notice"
+          data-tone={item.tone}
           variant={item.tone === "error" ? "destructive" : "default"}
           className="rounded-xl"
         >

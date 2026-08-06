@@ -8,8 +8,10 @@ import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session-cookie";
  * Doing it here rather than in the page means the id exists *before* the server
  * component renders, so the first paint can already include the restored
  * conversation — no client-side fetch, no empty-then-populated flash.
+ *
+ * (This is Next 16's `proxy.ts`; it replaced `middleware.ts`, same contract.)
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (request.cookies.get(SESSION_COOKIE)?.value) {
     return NextResponse.next();
   }
@@ -26,7 +28,7 @@ export function middleware(request: NextRequest) {
 
 /**
  * Pages only. API routes are excluded deliberately: the chat routes read and
- * rotate the cookie themselves, and letting middleware mint one first meant a
+ * rotate the cookie themselves, and letting the proxy mint one first meant a
  * DELETE emitted two Set-Cookie headers and "reset" a session it had just
  * created. A request that reaches the API without a cookie is a client that
  * never loaded the page, and gets a clean 400 instead.

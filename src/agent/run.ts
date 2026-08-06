@@ -16,6 +16,7 @@ import { executeTool, getTool, toFunctionTools } from "./tools/registry";
 import type { ToolContext } from "./tools/types";
 import { together } from "./together";
 import { appendUserMessage, applyAgentEvent } from "./transcript";
+import { VisibleTextFilter } from "./visible-text";
 
 /** A tool call reassembled from streaming deltas. */
 interface PendingToolCall {
@@ -101,6 +102,9 @@ export async function* runAgent(
       yield emit({ type: "message_start" });
 
       let text = "";
+      // Keeps the model's private reasoning channel out of the customer's view
+      // and out of the stored transcript.
+      const visible = new VisibleTextFilter();
       const toolCalls: PendingToolCall[] = [];
       let reportedPromptTokens: number | null = null;
       let reportedCompletionTokens: number | null = null;
@@ -112,8 +116,11 @@ export async function* runAgent(
 
         const content = choice?.delta?.content;
         if (content) {
-          text += content;
-          yield emit({ type: "text_delta", text: content });
+          const shown = visible.push(content);
+          if (shown) {
+            text += shown;
+            yield emit({ type: "text_delta", text: shown });
+          }
         }
 
         // Tool calls stream in fragments keyed by index: the name arrives once,
@@ -132,6 +139,12 @@ export async function* runAgent(
           reportedPromptTokens = chunk.usage.prompt_tokens ?? null;
           reportedCompletionTokens = chunk.usage.completion_tokens ?? null;
         }
+      }
+
+      const tail = visible.flush();
+      if (tail) {
+        text += tail;
+        yield emit({ type: "text_delta", text: tail });
       }
 
       const calls = toolCalls.filter(Boolean);

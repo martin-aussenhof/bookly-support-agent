@@ -47,7 +47,12 @@ export function ChatPanel({ initialUsage, initialItems }: ChatPanelProps) {
   }, [router, setItems]);
 
   return (
-    <div className="app-ambient flex h-dvh flex-col">
+    // `data-streaming` lets an end-to-end test await a turn without polling text.
+    <div
+      className="app-ambient flex h-dvh flex-col"
+      data-testid="chat-panel"
+      data-streaming={isStreaming ? "true" : "false"}
+    >
       <header className="bg-background/70 supports-backdrop-filter:bg-background/55 sticky top-0 z-30 border-b backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-360 items-center gap-3 px-4 py-2.5 sm:px-6 sm:py-3 lg:px-8">
           <Wordmark />
@@ -63,6 +68,7 @@ export function ChatPanel({ initialUsage, initialItems }: ChatPanelProps) {
               className="hidden rounded-full sm:inline-flex"
               onClick={reset}
               disabled={(items.length === 0 && !isStreaming) || isResetting}
+              data-testid="new-chat"
             >
               <RotateCcw className="size-3.5" />
               New chat

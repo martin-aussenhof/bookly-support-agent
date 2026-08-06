@@ -45,15 +45,27 @@ export const startReturn = defineTool({
       const eligibility = checkReturnEligibility(order, sku, reasonCode);
 
       if (!eligibility.eligible) {
+        const knownSku = order.items.some((item) => item.sku === sku);
         return {
           isError: true,
           summary: `Return refused — ${eligibility.reason}`,
           data: {
-            error: "not_eligible",
+            error: knownSku ? "not_eligible" : "unknown_sku",
             message: eligibility.reason,
-            hint:
-              "Explain the policy to the customer in plain language. If they are " +
-              "unhappy with the outcome, offer to escalate to a human agent.",
+            // Always echo the real items back. Models occasionally invent a
+            // plausible-looking SKU rather than copying the one from
+            // lookup_order; without this the refusal is a dead end, and with it
+            // the model can correct itself on the next step of the same turn.
+            availableItems: order.items.map((item) => ({
+              sku: item.sku,
+              title: item.title,
+              finalSale: item.finalSale ?? false,
+            })),
+            hint: knownSku
+              ? "Explain the policy to the customer in plain language. If they are " +
+                "unhappy with the outcome, offer to escalate to a human agent."
+              : "That SKU is not on this order. Retry with one of availableItems, " +
+                "copied exactly — never construct a SKU yourself.",
           },
         };
       }

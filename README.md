@@ -246,6 +246,24 @@ phrasing that talks past it, because the model never receives the data.
 `BK-10233` (marked delivered but never arrived — carrier-investigation policy), and
 `BK-10702` (out for delivery, three items, £57.47 — a denser tracking reply).
 
+### Recording the demos
+
+```bash
+pnpm demo            # headless, records all 8
+pnpm demo:headed     # watch it drive the browser
+pnpm demo -g "declines to invent"   # just one
+```
+
+Playwright drives the demo script above against a **real** model and writes one
+`video.webm` per demo to `recordings/`. It builds and starts the production server itself, so
+`TOGETHER_API_KEY` must be set. A full run takes ~4 minutes and costs a few cents.
+
+These are also the only end-to-end coverage of the streaming and tool-calling path, which
+unit tests cannot reach. Assertions are deliberately about **backend-determined** behaviour —
+which tools fired, what was refused, what the refund was — never the model's wording, and
+never the exact number of times it chose to call a read-only tool. A demo that fails because
+the agent phrased something differently is a demo nobody trusts.
+
 ## When it can't help
 
 Four levels, in order: **ask** rather than guess when information is missing; **say it can't

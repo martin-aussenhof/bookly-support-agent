@@ -28,6 +28,9 @@ export function ToolCard({ tool }: { tool: ToolItem }) {
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="sm:pl-4">
       <div
+        data-testid="tool-card"
+        data-tool={tool.name}
+        data-status={tool.status}
         className={cn(
           "bg-card/60 overflow-hidden rounded-xl border backdrop-blur-sm transition-colors",
           tool.status === "error" && "border-destructive/35 bg-destructive/5",
