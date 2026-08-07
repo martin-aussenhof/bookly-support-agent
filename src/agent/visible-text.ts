@@ -12,21 +12,17 @@
  * channel names surface as the first word of a reply ("finalI'm not able to
  * confirm…"), which is the tell that gives the whole illusion away.
  *
- * An earlier version only understood one shape: a response opening with
- * `analysis` and closing with `assistantfinal`. Later iterations in the same
- * turn — the model calls after a tool result — routinely open on a different
- * channel, and those fell through as ordinary prose, markers and all. So this
- * matches markers wherever they legitimately appear rather than assuming the
- * response opens with one.
+ * The hard part is that every marker is also an ordinary English word. Three
+ * rules keep real prose intact:
  *
- * Two rules keep it from eating real words:
- *
- *   1. A channel name only counts as a marker when it runs *straight into* its
- *      content. A reply that genuinely opens "analysis of your order shows…"
- *      has a space after the word, and survives untouched.
- *   2. Mid-reply, a marker only counts on a segment boundary — directly after
- *      sentence-ending punctuation or a newline. That is what stops "your
- *      final refund" from quietly losing a word.
+ *   1. A marker runs *straight into* its content. "analysis of your order" has
+ *      a space after the word and is left alone.
+ *   2. Mid-stream, a marker sits on a boundary — after punctuation or a symbol,
+ *      never after a letter, digit or space. That is what saves "your final
+ *      refund" and "£12.99final".
+ *   3. The single-word markers are held to a stricter standard than the
+ *      compound ones, because `assistantfinal` collides with nothing while
+ *      `final` is a word, a prefix, and a JSON field name. See AMBIGUOUS below.
  *
  * It runs *during* streaming, so it cannot buffer the response and split it.
  * Instead it holds back a few characters — just longer than the longest marker
@@ -47,42 +43,55 @@ const REASONING_TAGS = [
  * section — a bare `assistant` is too weak a signal, because harmony emits it
  * *between* thoughts as well as before the answer.
  */
-const FINAL_TAGS = ["assistantfinal", "final"] as const;
+const CLOSING_TAGS_SRC = ["assistantfinal", "final"] as const;
 
 /** Structural, but says nothing about which channel comes next. Always dropped. */
 const BARE_TAGS = ["assistant"] as const;
 
+/**
+ * Markers that are also everyday words, so they need a sentence boundary before
+ * them and a non-lowercase character after.
+ *
+ * `.finally we can answer` and `(finalSale true, returnable false)` both looked
+ * like the end of a private channel to an earlier version of this, and the
+ * reasoning after them — field names included — went to the customer. The
+ * compound markers are exempt: nothing in English is `assistantfinal`, so a
+ * reply that genuinely begins in lower case still survives one.
+ */
+const AMBIGUOUS: ReadonlySet<string> = new Set(["final", "analysis", "commentary", "assistant"]);
+
 const byLengthDesc = (a: string, b: string) => b.length - a.length;
 
 /** Longest first, so `assistantfinal` is never mistaken for a bare `assistant`. */
-const ALL_TAGS: string[] = [...REASONING_TAGS, ...FINAL_TAGS, ...BARE_TAGS].sort(byLengthDesc);
-const CLOSING_TAGS: string[] = [...FINAL_TAGS].sort(byLengthDesc);
+const ALL_TAGS: string[] = [...REASONING_TAGS, ...CLOSING_TAGS_SRC, ...BARE_TAGS].sort(
+  byLengthDesc,
+);
+const CLOSING_TAGS: string[] = [...CLOSING_TAGS_SRC].sort(byLengthDesc);
 
 const REASONING = new Set<string>(REASONING_TAGS);
 
 /** Enough to hold the longest marker plus the character that proves it is one. */
 const HOLD_BACK = Math.max(...ALL_TAGS.map((tag) => tag.length)) + 1;
 
-/**
- * What may precede a mid-reply marker: punctuation or a symbol, never a letter,
- * digit, or space.
- *
- * Sentence-ending punctuation alone was too narrow. When the model quotes a
- * tool result back — which it does, despite being told not to — the marker
- * lands against the closing brace of the JSON (`"error":null}assistantanalysis`)
- * and sailed straight through. Excluding letters and digits keeps "your final
- * refund" and "£12.99final" intact, since the character before the word is a
- * space or a digit in those.
- */
+/** May precede a marker: punctuation or a symbol, never a letter, digit or space. */
 const BOUNDARY = /[^\p{L}\p{N}\s]/u;
+
+/** The tighter boundary, required before a marker that is also a word. */
+const SENTENCE_END = /[.!?\n]/;
+
+const LOWERCASE = /\p{Ll}/u;
 
 type Mode = "detecting" | "reasoning" | "visible";
 
 export class VisibleTextFilter {
   private mode: Mode = "detecting";
   private buffer = "";
-  /** Last character actually emitted, so a boundary spanning two deltas still reads as one. */
-  private lastEmitted = "";
+  /**
+   * The character immediately before `buffer[0]` in the original stream, so a
+   * boundary still reads correctly after the buffer has been sliced or the
+   * discarded reasoning trimmed. Empty only at the very start of the stream.
+   */
+  private previousChar = "";
 
   /** Feeds one delta in; returns the portion (possibly empty) safe to show. */
   push(delta: string): string {
@@ -105,6 +114,13 @@ export class VisibleTextFilter {
     return this.drain(true);
   }
 
+  /** Drops `count` characters, keeping the boundary context they carried. */
+  private consume(count: number) {
+    if (count <= 0) return;
+    this.previousChar = this.buffer[count - 1] ?? this.previousChar;
+    this.buffer = this.buffer.slice(count);
+  }
+
   private drain(atEnd: boolean): string {
     let out = "";
 
@@ -115,7 +131,7 @@ export class VisibleTextFilter {
 
         const tag = this.tagAt(0);
         if (tag) {
-          this.buffer = this.buffer.slice(tag.length);
+          this.consume(tag.length);
           this.mode = REASONING.has(tag) ? "reasoning" : "visible";
         } else {
           this.mode = "visible";
@@ -128,10 +144,10 @@ export class VisibleTextFilter {
         if (end === null) {
           // Drop the private text, but keep a tail in case a marker is split
           // across this delta and the next.
-          if (this.buffer.length > HOLD_BACK) this.buffer = this.buffer.slice(-HOLD_BACK);
+          if (this.buffer.length > HOLD_BACK) this.consume(this.buffer.length - HOLD_BACK);
           return out;
         }
-        this.buffer = this.buffer.slice(end);
+        this.consume(end);
         this.mode = "visible";
         continue;
       }
@@ -156,46 +172,33 @@ export class VisibleTextFilter {
     const limit = atEnd ? this.buffer.length : this.buffer.length - HOLD_BACK;
     if (limit <= 0) return { text: "", reopenedPrivate: false };
 
-    let out = "";
     let index = 0;
-
     while (index < limit) {
-      const previous = index > 0 ? this.buffer[index - 1] : this.lastEmitted;
-      const tag = previous && BOUNDARY.test(previous) ? this.tagAt(index) : null;
-
+      const tag = this.tagAt(index);
       if (tag) {
-        this.buffer = this.buffer.slice(index + tag.length);
-        if (out) this.lastEmitted = out[out.length - 1];
+        const text = this.buffer.slice(0, index);
+        this.consume(index + tag.length);
 
         if (REASONING.has(tag)) {
           this.mode = "reasoning";
-          return { text: out, reopenedPrivate: true };
+          return { text, reopenedPrivate: true };
         }
         // A final or bare marker: drop it and keep reading the reply after it.
         const rest = this.drainVisible(atEnd);
-        return { text: out + rest.text, reopenedPrivate: rest.reopenedPrivate };
+        return { text: text + rest.text, reopenedPrivate: rest.reopenedPrivate };
       }
-      out += this.buffer[index];
       index += 1;
     }
 
-    this.buffer = this.buffer.slice(index);
-    if (out) this.lastEmitted = out[out.length - 1];
-    return { text: out, reopenedPrivate: false };
+    const text = this.buffer.slice(0, limit);
+    this.consume(limit);
+    return { text, reopenedPrivate: false };
   }
 
   /** The marker starting exactly at `index`, if one does. */
   private tagAt(index: number): string | null {
     for (const tag of ALL_TAGS) {
-      if (!this.buffer.startsWith(tag, index)) continue;
-
-      const next = this.buffer[index + tag.length];
-      // A marker runs straight into its content. The word standing on its own
-      // — "final answer", "analysis of your order" — has whitespace after it.
-      // `undefined` means the proof has not arrived yet, so decline for now.
-      if (next === undefined || /\s/.test(next)) continue;
-
-      return tag;
+      if (this.matches(tag, index)) return tag;
     }
     return null;
   }
@@ -204,14 +207,32 @@ export class VisibleTextFilter {
   private findClosingTag(): number | null {
     for (let index = 0; index < this.buffer.length; index += 1) {
       for (const tag of CLOSING_TAGS) {
-        if (!this.buffer.startsWith(tag, index)) continue;
-
-        const next = this.buffer[index + tag.length];
-        if (next === undefined || /\s/.test(next)) continue;
-
-        return index + tag.length;
+        if (this.matches(tag, index)) return index + tag.length;
       }
     }
     return null;
+  }
+
+  /** Whether `tag` really is a channel marker at `index`, rather than a word. */
+  private matches(tag: string, index: number): boolean {
+    if (!this.buffer.startsWith(tag, index)) return false;
+
+    const next = this.buffer[index + tag.length];
+    // A marker runs straight into its content. The word standing on its own —
+    // "final answer", "analysis of your order" — has whitespace after it.
+    // `undefined` means the proof has not arrived yet, so decline for now.
+    if (next === undefined || /\s/.test(next)) return false;
+
+    const previous = index > 0 ? this.buffer[index - 1] : this.previousChar;
+    const ambiguous = AMBIGUOUS.has(tag);
+
+    // A word cannot continue past a marker: `finally`, `analysis`' own plural.
+    if (ambiguous && LOWERCASE.test(next)) return false;
+
+    // Nothing before it at all is the start of the stream, where the channel is
+    // declared and any marker is legitimate.
+    if (previous === "") return true;
+
+    return (ambiguous ? SENTENCE_END : BOUNDARY).test(previous);
   }
 }

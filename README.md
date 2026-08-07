@@ -1,15 +1,15 @@
 # Bookly Support Agent
 
 A conversational AI support agent for **Bookly**, a fictional online bookstore. It answers
-order-status questions, files returns, and handles general policy questions — and knows when
+order-status questions, files returns, and handles general policy questions - and knows when
 to stop and ask, or hand over to a human.
 
-Built with Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, and **Together AI**.
-The agent loop is hand-written: no agent framework sits between the code and the API.
+Built with Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, and Together AI.
+The agent loop is AI/hand-written: no agent framework sits between the code and the API.
 
-## 📊 Pitch deck
+## 📊 Slide deck
 
-**[Solution pitch deck (Google Slides)](https://docs.google.com/presentation/d/129vfXiRlmWq4ra2itSpBlQbIYoTCbKSS6E414FWdrR4/edit?slide=id.g3f67cbde01c_0_0#slide=id.g3f67cbde01c_0_0)**
+**[Solution slide deck (Google Slides)](https://docs.google.com/presentation/d/129vfXiRlmWq4ra2itSpBlQbIYoTCbKSS6E414FWdrR4/edit?slide=id.g3f67cbde01c_0_0#slide=id.g3f67cbde01c_0_0)**
 — the thesis, the architecture, the decisions and their tradeoffs, and what I would change
 first.
 
@@ -23,7 +23,8 @@ httpOnly cookie, but the **cost meter in the header is global**: it shows spend 
 visitor, because cost per resolved conversation is the number that decides whether a model
 choice survives production traffic. And the agent is talking to a real model, so its wording
 varies between runs. The tool calls, the refusals, and the money do not — those come from the
-backend.
+backend. The meter is purely for this interview task. It would not be visible to the customer
+of the client in production (see slide 1 in slide deck).
 
 ## 💻 Running it locally
 
@@ -35,13 +36,15 @@ pnpm dev                     # http://localhost:3000
 
 `pnpm typecheck`, `pnpm lint`, and `pnpm build` all run clean.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `TOGETHER_API_KEY` | yes | Together AI inference |
-| `DATABASE_URL` | no | Neon Postgres — stores conversations and the cost ledger. Without it both fall back to memory and reset on restart. |
+| Variable           | Required | Purpose                                                                                                             |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `TOGETHER_API_KEY` | yes      | Together AI inference                                                                                               |
+| `DATABASE_URL`     | no       | Neon Postgres — stores conversations and the cost ledger. Without it both fall back to memory and reset on restart. |
 
 Tables are created automatically on first write — a fresh Neon database needs no migration
 step. [`db/schema.sql`](db/schema.sql) is the readable version.
+
+Note: This should also work with `npm` as package manager, but I haven't tested it.
 
 ## 🎬 Demo cases
 
@@ -52,41 +55,41 @@ already shown would add running time without adding to it.
 Every line under **You** is copy-pasteable.
 
 **Turn on the `{ }` toggle in the header before you present.** The chat opens in the view a
-customer would get: the agent says what it did in plain words — *"Checked your order"* — and
-nothing else. Tool names, arguments, results and token counts are not written for a customer,
-so they are not shown to one. The toggle switches to the reviewer's view, where every call
+customer would get: the agent says what it is doing in its own voice — _"I've pulled up your
+order"_, _"I've checked our policies"_ — and nothing else. Tool names, arguments, results and
+token counts are not written for a customer, so they are not shown to one. The toggle switches to the reviewer's view, where every call
 expands to its raw input and result. That panel is what makes an answer auditable rather than
 merely fluent, and it is the thing worth clicking open on stage.
 
 [bookly-support.vercel.app/?inspect=1](https://bookly-support.vercel.app/?inspect=1) opens
 straight into it.
 
-| | Demo 1 | Demo 2 | Demo 3 |
-| --- | --- | --- | --- |
-| Multi-turn, collecting information first | ✅ | ✅ | |
-| Taking an action / using a tool | ✅ | ✅ | ✅ |
-| Asks a clarifying question instead of answering | ✅ | | |
+|                                                 | Demo 1 | Demo 2 | Demo 3 |
+| ----------------------------------------------- | ------ | ------ | ------ |
+| Multi-turn, collecting information first        | ✅     | ✅     |        |
+| Taking an action / using a tool                 | ✅     | ✅     | ✅     |
+| Asks a clarifying question instead of answering | ✅     |        |        |
 
 ### The test data
 
 Eight orders across four customers, in
 [`src/server/bookly/data/orders.ts`](src/server/bookly/data/orders.ts). Dates are stored as
-offsets from *now*, so the inside/outside-the-return-window cases stay correct whenever you
+offsets from _now_, so the inside/outside-the-return-window cases stay correct whenever you
 run it. Each order exists to make one branch reachable.
 
 The agent will not open an order without a matching email — that check is enforced in the
 backend, so these pairs are the credentials for the demo:
 
-| Order | Email | State |
-| --- | --- | --- |
-| `BK-10432` | `maya.chen@example.com` | Delivered 4d ago, **2 items** |
-| `BK-10588` | `maya.chen@example.com` | In transit, arrives in 2d |
-| `BK-10774` | `maya.chen@example.com` | Delivered, contains a **signed edition** (final sale) |
-| `BK-09877` | `sam.okafor@example.com` | Delivered **58d ago** — outside the window |
-| `BK-10601` | `sam.okafor@example.com` | Still processing — cancellable, not returnable |
-| `BK-10655` | `priya.raman@example.com` | Delivered 3d ago — the **damaged** book |
-| `BK-10233` | `priya.raman@example.com` | Marked delivered 6d ago, never arrived |
-| `BK-10702` | `james.whitlock@example.com` | Out for delivery, 3 items, £57.47 |
+| Order      | Email                        | State                                                 |
+| ---------- | ---------------------------- | ----------------------------------------------------- |
+| `BK-10432` | `maya.chen@example.com`      | Delivered 4d ago, **2 items**                         |
+| `BK-10588` | `maya.chen@example.com`      | In transit, arrives in 2d                             |
+| `BK-10774` | `maya.chen@example.com`      | Delivered, contains a **signed edition** (final sale) |
+| `BK-09877` | `sam.okafor@example.com`     | Delivered **58d ago** — outside the window            |
+| `BK-10601` | `sam.okafor@example.com`     | Still processing — cancellable, not returnable        |
+| `BK-10655` | `priya.raman@example.com`    | Delivered 3d ago — the **damaged** book               |
+| `BK-10233` | `priya.raman@example.com`    | Marked delivered 6d ago, never arrived                |
+| `BK-10702` | `james.whitlock@example.com` | Out for delivery, 3 items, £57.47                     |
 
 ---
 
@@ -97,11 +100,11 @@ This one demo carries all three of the brief's minimum requirements.
 
 > **You:** I want to return a book
 >
-> *Agent asks for the order number and the email — it cannot look anything up without both.*
+> _Agent asks for the order number and the email — it cannot look anything up without both._
 >
 > **You:** BK-10432, maya.chen@example.com
 >
-> *Agent looks the order up, sees two items, and asks which one.*
+> _Agent looks the order up, sees two items, and asks which one._
 >
 > **You:** The Hawking one. I just didn't get on with it.
 
@@ -113,8 +116,8 @@ This one demo carries all three of the brief's minimum requirements.
 cheapest way to make an agent dangerous is to let it resolve ambiguity silently on a write
 action.
 
-**Then, if the room is technical:** run the same flow with a damaged book — *"My copy of
-Piranesi turned up with a torn cover"*, `BK-10655`, `priya.raman@example.com`. Same tool, same
+**Then, if the room is technical:** run the same flow with a damaged book — _"My copy of
+Piranesi turned up with a torn cover"_, `BK-10655`, `priya.raman@example.com`. Same tool, same
 order shape, but the fee is **waived** and the full **£14.50** comes back, because
 `reasonCode` is a priced enum evaluated in `checkReturnEligibility` rather than a sentence the
 model wrote. The reply and the receipt cannot disagree.
@@ -123,7 +126,7 @@ model wrote. The reply and the receipt cannot disagree.
 
 ### Demo 2 — The refusal is precise, and it recovers
 
-`BK-10774` contains a signed first edition (final sale) *and* an ordinary paperback.
+`BK-10774` contains a signed first edition (final sale) _and_ an ordinary paperback.
 
 > **You:** I'd like to return the signed Ishiguro from BK-10774, maya.chen@example.com
 
@@ -136,7 +139,7 @@ Then, without starting a new chat:
 
 **Fires:** `start_return` → **succeeds**, £10.00 refunded.
 
-**Point at:** the refusal is per *item*, not per order — a prompt-level rule would almost
+**Point at:** the refusal is per _item_, not per order — a prompt-level rule would almost
 certainly have blocked the whole order or none of it. And the "no" is not a dead end: the
 agent stays useful in the same conversation.
 
@@ -219,20 +222,20 @@ Browser  ──POST /api/chat──▶  Route  ──▶  runAgent()  ──▶ 
                                               └──▶ Usage ledger ───▶ Neon
 ```
 
-| Path | Role |
-| --- | --- |
-| `src/agent/run.ts` | The orchestration loop. Reassembles tool calls, enforces the step budget, meters cost, and decides which of the model's words the customer is allowed to see. |
-| `src/server/usage/pricing.ts` | **Token prices. The file to edit.** |
-| `src/server/usage/store.ts` | Neon-backed usage ledger, with an in-memory fallback. |
-| `src/agent/tools/` | One file per capability. Zod schema per tool, compiled to JSON Schema *and* used to validate what the model sends back. |
-| `src/agent/memory/` | Server-owned session state, persisted to Neon: the transcript the model sees, the transcript the browser renders, and the structured facts the system trusts. |
-| `src/agent/transcript.ts` | The one reducer turning agent events into renderable items — shared by the loop and the client. |
-| `src/agent/prompts/` | System prompt, split into a frozen base and a per-turn facts block so the prefix stays stable. |
-| `src/agent/visible-text.ts` | Strips the model's private reasoning channel out of the stream before it reaches the customer. |
-| `src/server/bookly/` | Mock commerce API. Knows nothing about agents — swap for real HTTP calls without touching `src/agent/`. |
-| `src/components/chat/` | Transcript UI, in two views — see below. |
-| `src/hooks/use-inspect.ts` | Which of the two views you are in. |
-| `src/agent/events.ts` | The single `AgentEvent` union shared by the loop, the route, and the client hook. |
+| Path                          | Role                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/agent/run.ts`            | The orchestration loop. Reassembles tool calls, enforces the step budget, meters cost, and decides which of the model's words the customer is allowed to see. |
+| `src/server/usage/pricing.ts` | **Token prices. The file to edit.**                                                                                                                           |
+| `src/server/usage/store.ts`   | Neon-backed usage ledger, with an in-memory fallback.                                                                                                         |
+| `src/agent/tools/`            | One file per capability. Zod schema per tool, compiled to JSON Schema _and_ used to validate what the model sends back.                                       |
+| `src/agent/memory/`           | Server-owned session state, persisted to Neon: the transcript the model sees, the transcript the browser renders, and the structured facts the system trusts. |
+| `src/agent/transcript.ts`     | The one reducer turning agent events into renderable items — shared by the loop and the client.                                                               |
+| `src/agent/prompts/`          | System prompt, split into a frozen base and a per-turn facts block so the prefix stays stable.                                                                |
+| `src/agent/visible-text.ts`   | Strips the model's private reasoning channel out of the stream before it reaches the customer.                                                                |
+| `src/server/bookly/`          | Mock commerce API. Knows nothing about agents — swap for real HTTP calls without touching `src/agent/`.                                                       |
+| `src/components/chat/`        | Transcript UI, in two views — see below.                                                                                                                      |
+| `src/hooks/use-inspect.ts`    | Which of the two views you are in.                                                                                                                            |
+| `src/agent/events.ts`         | The single `AgentEvent` union shared by the loop, the route, and the client hook.                                                                             |
 
 ### Three decisions worth defending
 
@@ -252,7 +255,7 @@ transcript the model reads can't be edited by the client.
 
 ### Two views of the same transcript
 
-Showing the tool calls is the grounding argument. Showing them *to the customer* is a
+Showing the tool calls is the grounding argument. Showing them _to the customer_ is a
 different claim, and a worse one — `lookup_order`, a JSON payload, and `3,092 in · 460 out`
 are written for whoever is evaluating the agent.
 
@@ -280,7 +283,7 @@ corrected two seconds later by the real one.
 
 So the loop holds an iteration's text until the model stops calling tools, and discards it
 otherwise. This is why a reply lands whole rather than typing itself out: content arrives
-*before* tool-call deltas, so there is no point at which it could be streamed and still taken
+_before_ tool-call deltas, so there is no point at which it could be streamed and still taken
 back before the customer had read it. Tool cards stream throughout, so the wait is not silent.
 
 ## 🧠 Conversation persistence
@@ -294,16 +297,16 @@ hydration fetch and no empty-then-populated flash. httpOnly also means page scri
 read or forge the id, so the browser can no longer choose which conversation it is talking
 to; the client posts `{ message }` and nothing else.
 
-| Action | Result |
-| --- | --- |
-| Refresh | Conversation restored, server-rendered |
-| Close tab, return later | Restored (within 30 days) |
-| Server restart | Restored, if `DATABASE_URL` is set |
+| Action                   | Result                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Refresh                  | Conversation restored, server-rendered                                                                                                           |
+| Close tab, return later  | Restored (within 30 days)                                                                                                                        |
+| Server restart           | Restored, if `DATABASE_URL` is set                                                                                                               |
 | Close the tab mid-answer | The turn is cancelled. A reply the agent had not finished is not shown and not stored — an unfinished thought is exactly the thing worth losing. |
-| "New chat" | Transcript deleted and the cookie rotated — the old one is unreachable, not just hidden |
+| "New chat"               | Transcript deleted and the cookie rotated — the old one is unreachable, not just hidden                                                          |
 
 Two things are stored per session, written in the same statement: `messages` (what the model
-reads) and `transcript` (what the browser renders). They are folded by the *same* reducer —
+reads) and `transcript` (what the browser renders). They are folded by the _same_ reducer —
 [`src/agent/transcript.ts`](src/agent/transcript.ts), shared by the loop and the client hook —
 so a restored conversation is identical to the one you watched, tool cards and costs included,
 rather than a lookalike rebuilt by a second implementation that would eventually drift.
@@ -334,7 +337,7 @@ Four levels, in order: **ask** rather than guess when information is missing; **
 confirm** when retrieval comes back empty; **explain the refusal** when policy says no; and
 **escalate** with a handover note written for the colleague, not the customer. Underneath all
 of it, tool failures — malformed arguments, exceptions, unknown tools — come back as tool
-*results* carrying a hint, so the model can retry or ask rather than the turn dying.
+_results_ carrying a hint, so the model can retry or ask rather than the turn dying.
 
 Two paths are handled in code rather than left to the model:
 
@@ -376,12 +379,12 @@ Two paths are handled in code rather than left to the model:
   model that invents a new channel name would need a new rule.
 - **SKUs still reach the customer sometimes.** The prompt tells the agent to name a book by its
   title and keep SKUs in tool arguments, and it mostly does — but it is an instruction, not a
-  guarantee, and a run will occasionally offer *"A Brief History of Time (SKU 9780553380163)"*.
+  guarantee, and a run will occasionally offer _"A Brief History of Time (SKU 9780553380163)"_.
   The durable fix is to stop putting SKUs in the model's context at all: hand it an opaque item
   reference from `lookup_order`, have `start_return` take that, and let the backend resolve it.
   Then there is no SKU available to leak.
 - **The agent will still occasionally reason from an empty result.** Asked about vinyl records
   it usually says it cannot confirm, which is right; sometimes it concludes Bookly does not
   stock them, which happens to be true but is not something retrieval told it. Grounding is
-  enforced for tool *data*, not for inference on top of it.
+  enforced for tool _data_, not for inference on top of it.
 - Prices in GBP. The mock backend adds ~350ms of latency so streaming and tool timing look real.

@@ -52,10 +52,21 @@ export const lookupOrder = defineTool({
           // by the same function that will refuse the write. Without this the
           // model sees `finalSale: true`, has no way to know what Bookly does
           // about that, and cheerfully offers a return it cannot deliver.
+          // Listed field by field rather than spread, so what the model can see
+          // is a decision rather than whatever `OrderItem` happens to hold.
+          //
+          // `finalSale` is deliberately absent: `returnable` already carries
+          // what it means, and the model wrote the raw flag into its reasoning,
+          // where "finalSale" looks enough like harmony's `final` channel
+          // marker to end a private section early and spill the rest.
           items: order.items.map((item) => {
             const allowed = checkItemReturnable(order, item.sku);
             return {
-              ...item,
+              sku: item.sku,
+              title: item.title,
+              author: item.author,
+              quantity: item.quantity,
+              unitPriceCents: item.unitPriceCents,
               unitPrice: gbp(item.unitPriceCents),
               returnable: allowed.returnable,
               ...(allowed.returnable ? {} : { notReturnableBecause: allowed.reason }),

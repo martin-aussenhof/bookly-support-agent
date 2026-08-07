@@ -12,7 +12,13 @@ import { cn } from "@/lib/utils";
 import type { ToolItem } from "@/types/chat";
 
 /**
- * What the agent did, in the customer's words.
+ * What the agent is doing, said to the customer.
+ *
+ * Written as the agent speaking to the person it is helping — "I've checked
+ * your order", not "lookup_order ok" and not "Checked your order" either, which
+ * is still a log line with the pronouns filed off. Nothing here names an
+ * internal system: a customer has no model of a "help centre index" or an
+ * "order service", so these say what it means for them.
  *
  * Keyed on the tool and its outcome rather than on anything the backend
  * returned, so this cannot leak a payload even by accident. `lookup_order`
@@ -22,31 +28,38 @@ import type { ToolItem } from "@/types/chat";
  */
 const ACTIVITY: Record<string, Record<ToolItem["status"], string>> = {
   lookup_order: {
-    running: "Looking up your order",
-    ok: "Checked your order",
-    error: "Couldn't find that order",
+    running: "Looking up your order…",
+    ok: "I've pulled up your order",
+    error: "I couldn't find that order",
   },
   search_help_center: {
-    running: "Checking the help centre",
-    ok: "Checked the help centre",
-    error: "Couldn't check the help centre",
+    running: "Checking our policies…",
+    ok: "I've checked our policies",
+    error: "I couldn't check our policies",
   },
   start_return: {
-    running: "Setting up your return",
-    ok: "Return filed",
-    error: "Couldn't file that return",
+    running: "Setting up your return…",
+    ok: "I've set up your return",
+    error: "I couldn't set up that return",
   },
   escalate_to_human: {
-    running: "Finding a colleague",
-    ok: "Passed to a colleague",
-    error: "Couldn't reach a colleague",
+    running: "Finding someone to help…",
+    ok: "I've passed this to a colleague",
+    error: "I couldn't reach a colleague",
   },
 };
 
+/** Used when a capability is added and nobody writes it a line here. */
+const FALLBACK: Record<ToolItem["status"], string> = {
+  running: "Working on that…",
+  ok: "Done",
+  error: "That didn't work",
+};
+
 function activity(tool: ToolItem): string {
-  // The fallback never names the tool — a capability added later must not start
-  // leaking its internal name to customers just because this map was missed.
-  return ACTIVITY[tool.name]?.[tool.status] ?? (tool.status === "error" ? "That didn't work" : "Working");
+  // Never falls back to the tool's own name: a capability added later must not
+  // start leaking its internal name to customers just because this map was missed.
+  return ACTIVITY[tool.name]?.[tool.status] ?? FALLBACK[tool.status];
 }
 
 /**

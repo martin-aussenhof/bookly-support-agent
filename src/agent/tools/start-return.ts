@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { checkReturnEligibility, createReturn, getOrderForCustomer } from "@/server/bookly/client";
+import {
+  checkItemReturnable,
+  checkReturnEligibility,
+  createReturn,
+  getOrderForCustomer,
+} from "@/server/bookly/client";
 import { BooklyError } from "@/server/bookly/types";
 import { gbp, plainStatus } from "./format";
 import { defineTool } from "./types";
@@ -60,7 +65,8 @@ export const startReturn = defineTool({
             availableItems: order.items.map((item) => ({
               sku: item.sku,
               title: item.title,
-              finalSale: item.finalSale ?? false,
+              // Same as lookup_order: what it means, not the raw flag.
+              returnable: checkItemReturnable(order, item.sku).returnable,
             })),
             hint: knownSku
               ? "Explain the policy to the customer in plain language. If they are " +
