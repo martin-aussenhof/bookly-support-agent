@@ -13,6 +13,11 @@ The agent loop is AI/hand-written: no agent framework sits between the code and 
 — the thesis, the architecture, the decisions and their tradeoffs, and what I would change
 first.
 
+## 📹 Watch the demo
+
+**[bookly-support.vercel.app/demo](https://bookly-support.vercel.app/demo)** — about a minute,
+all three demos in one continuous take against a real model. Nothing mocked, nothing sped up.
+
 ## 🚀 Live demo
 
 **[bookly-support.vercel.app](https://bookly-support.vercel.app/)** — no setup, no key. All
@@ -159,7 +164,8 @@ pnpm demo:headed     # watch it drive the browser
 
 Playwright drives the demo script above against a **real** model and records all three demos
 as **one continuous take** — `recordings/demos-the-demo-reel-demo/video.webm`, about a minute
-of 1280×800. One file rather than three, because the artefact is something a person watches
+of 1280×800. That is the file served at [`/demo`](https://bookly-support.vercel.app/demo);
+to publish a new one, copy it to `public/bookly-demo.webm`. One file rather than three, because the artefact is something a person watches
 start to finish; the "New chat" between demos is the seam, and it is a real feature rather
 than a test hook. Each demo is a `test.step`, so a failure still names the one that broke.
 

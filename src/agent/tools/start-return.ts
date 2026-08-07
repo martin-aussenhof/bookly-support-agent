@@ -83,6 +83,8 @@ export const startReturn = defineTool({
         createdReturnIds: [...ctx.facts.createdReturnIds, request.id],
       });
 
+      const feeApplied = eligibility.feeCents > 0;
+
       return {
         summary: `Return ${request.id} created — ${gbp(request.refundCents)} refund`,
         data: {
@@ -90,14 +92,26 @@ export const startReturn = defineTool({
           status: request.status,
           statusText: plainStatus(request.status),
           refundCents: request.refundCents,
-          refund: gbp(request.refundCents),
+          /**
+           * The final figure, fee already deducted.
+           *
+           * Named and described this way because the earlier `refund` sat next
+           * to `labelFee` and the model did the obvious thing: subtracted one
+           * from the other and told a customer they were getting £13.01 on a
+           * £16.00 refund. The arithmetic was already done here; the payload
+           * just had not said so.
+           */
+          amountCustomerReceives: gbp(request.refundCents),
           labelFeeCents: eligibility.feeCents,
-          labelFee: gbp(eligibility.feeCents),
-          labelFeeWaived: eligibility.feeCents === 0,
+          labelFeeApplied: feeApplied,
+          feeExplanation: feeApplied
+            ? `The £${(eligibility.feeCents / 100).toFixed(2)} return-label fee has already been taken off. ${gbp(request.refundCents)} is the final amount.`
+            : "No return-label fee — Bookly pays the postage when the item is faulty or mis-shipped.",
           nextSteps:
             "A prepaid label has been emailed to the customer. The refund is issued " +
             "once the parcel is scanned at the warehouse (3-5 business days after that). " +
-            "Tell the customer the exact refund amount and whether the label fee applied.",
+            `Tell the customer they will receive ${gbp(request.refundCents)}. Do not subtract ` +
+            "the label fee again, and do not do any arithmetic of your own on this figure.",
         },
       };
     } catch (error) {
