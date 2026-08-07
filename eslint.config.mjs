@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright artefacts. Both are generated, both are gitignored, and a
+    // failed run drops enough into them to bury a real lint error in thousands
+    // of complaints about a bundled report.
+    "recordings/**",
+    "playwright-report/**",
   ]),
 ]);
 

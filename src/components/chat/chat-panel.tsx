@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { Braces, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useTransition } from "react";
 
@@ -11,8 +11,11 @@ import { Transcript } from "@/components/chat/transcript";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgentChat } from "@/hooks/use-agent-chat";
+import { useInspect } from "@/hooks/use-inspect";
 import { useUsageMeter } from "@/hooks/use-usage-meter";
+import { cn } from "@/lib/utils";
 import type { TranscriptItem } from "@/types/chat";
 import type { UsageSnapshot } from "@/types/usage";
 
@@ -26,6 +29,7 @@ export function ChatPanel({ initialUsage, initialItems }: ChatPanelProps) {
   const router = useRouter();
   const [isResetting, startReset] = useTransition();
 
+  const [inspect, toggleInspect] = useInspect();
   const { snapshot, refresh, applyTotal } = useUsageMeter(initialUsage);
   const { items, isStreaming, send, setItems } = useAgentChat(initialItems, {
     // Move the meter the instant the turn ends, then re-sync so spend from
@@ -86,17 +90,50 @@ export function ChatPanel({ initialUsage, initialItems }: ChatPanelProps) {
               <RotateCcw className="size-4" />
             </Button>
 
+            <InspectToggle inspect={inspect} onToggle={toggleInspect} />
+
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       <main className="min-h-0 flex-1">
-        <Transcript items={items} empty={<EmptyState onPick={send} />} />
+        <Transcript items={items} empty={<EmptyState onPick={send} />} inspect={inspect} />
       </main>
 
       <Composer disabled={isStreaming} onSend={send} />
     </div>
+  );
+}
+
+/**
+ * The one control that is not for the customer.
+ *
+ * Left visible rather than hidden behind a key combination on purpose: the
+ * claim this project makes is that every answer is traceable to a tool result,
+ * and a claim you have to be told how to check is worth less than one sitting
+ * in the toolbar.
+ */
+function InspectToggle({ inspect, onToggle }: { inspect: boolean; onToggle: () => void }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn("size-9 rounded-full", inspect && "bg-accent text-accent-foreground")}
+          onClick={onToggle}
+          aria-pressed={inspect}
+          aria-label={inspect ? "Hide tool calls" : "Show tool calls"}
+          data-testid="inspect-toggle"
+        >
+          <Braces className="size-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="end">
+        {inspect ? "Hide the tool calls behind each answer" : "Show the tool calls behind each answer"}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

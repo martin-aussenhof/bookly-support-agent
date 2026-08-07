@@ -51,7 +51,9 @@ test("1 - it asks, then it acts", async ({ page }) => {
   const ret = page.locator(RETURN_CARD);
   await expect(ret).toHaveCount(1);
   await expect(ret).toHaveAttribute("data-status", "ok");
-  await revealTool(page, "start_return");
+  // Open the card the assertion is about. Opening "the last one" would depend
+  // on whether the agent left another attempt behind it.
+  await revealCard(page, ret);
   // £18.99 less the £2.99 label fee — priced by the backend, not the model.
   await expect(ret).toContainText("1600");
   await holdFinalFrame(page);
@@ -75,7 +77,9 @@ test("2 - the refusal is precise, and recovers", async ({ page }) => {
   // assertion that proves the rule is per item rather than per order.
   const accepted = page.locator(RETURN_OK);
   await expect(accepted).toHaveCount(1);
-  await revealTool(page, "start_return");
+  // The accepted card specifically: the agent sometimes leaves a second refused
+  // attempt behind it, and opening that one shows a refusal instead of the money.
+  await revealCard(page, accepted);
   await expect(accepted).toContainText("1000");
   await holdFinalFrame(page);
 });

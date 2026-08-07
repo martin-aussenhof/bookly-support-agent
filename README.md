@@ -49,9 +49,17 @@ step. [`db/schema.sql`](db/schema.sql) is the readable version.
 constrained, then honest. That arc is the whole argument, and a fourth variation on a flow
 already shown would add running time without adding to it.
 
-Every line under **You** is copy-pasteable. Tool calls render inline in the transcript and
-expand to show their raw input and result — click one open while presenting; that panel is
-what makes the answer auditable rather than merely fluent.
+Every line under **You** is copy-pasteable.
+
+**Turn on the `{ }` toggle in the header before you present.** The chat opens in the view a
+customer would get: the agent says what it did in plain words — *"Checked your order"* — and
+nothing else. Tool names, arguments, results and token counts are not written for a customer,
+so they are not shown to one. The toggle switches to the reviewer's view, where every call
+expands to its raw input and result. That panel is what makes an answer auditable rather than
+merely fluent, and it is the thing worth clicking open on stage.
+
+[bookly-support.vercel.app/?inspect=1](https://bookly-support.vercel.app/?inspect=1) opens
+straight into it.
 
 | | Demo 1 | Demo 2 | Demo 3 |
 | --- | --- | --- | --- |
@@ -215,7 +223,8 @@ Browser  ──POST /api/chat──▶  Route  ──▶  runAgent()  ──▶ 
 | `src/agent/prompts/` | System prompt, split into a frozen base and a per-turn facts block so the prefix stays stable. |
 | `src/agent/visible-text.ts` | Strips the model's private reasoning channel out of the stream before it reaches the customer. |
 | `src/server/bookly/` | Mock commerce API. Knows nothing about agents — swap for real HTTP calls without touching `src/agent/`. |
-| `src/components/chat/` | Transcript UI. Tool calls are rendered inline and expandable. |
+| `src/components/chat/` | Transcript UI, in two views — see below. |
+| `src/hooks/use-inspect.ts` | Which of the two views you are in. |
 | `src/agent/events.ts` | The single `AgentEvent` union shared by the loop, the route, and the client hook. |
 
 ### Three decisions worth defending
@@ -233,6 +242,27 @@ Bookly's policies or any customer's orders. Every factual claim has to come back
 **Conversation state is server-owned.** The client posts `{ message }` and nothing else. Tool
 inputs, tool results, and the system prompt never travel to the browser as state, and the
 transcript the model reads can't be edited by the client.
+
+### Two views of the same transcript
+
+Showing the tool calls is the grounding argument. Showing them *to the customer* is a
+different claim, and a worse one — `lookup_order`, a JSON payload, and `3,092 in · 460 out`
+are written for whoever is evaluating the agent.
+
+So the transcript renders twice from the same items. The customer view says what happened in
+their language, keyed on the tool and its outcome rather than on anything the backend
+returned — which means it cannot leak a payload even by accident, because in that mode the
+component never reads one. A failed lookup and an order belonging to somebody else read
+identically on purpose: the agent's own reply tells the customer what to do next, and the
+difference between those two is not their business. Consecutive identical calls collapse to
+one line there, so a model that searches twice does not stutter at the customer.
+
+The `{ }` toggle switches to the reviewer's view, which hides nothing — every call, every
+duplicate, every payload, and the cost of each turn. The preference persists, and `?inspect=1`
+opens straight into it, which is how the demos are recorded.
+
+Both views carry the same `data-tool` and `data-status` attributes: they describe the call
+rather than display it, so the end-to-end specs read one contract regardless of view.
 
 ### Only a finished thought is shown
 
@@ -332,6 +362,12 @@ Two paths are handled in code rather than left to the model:
   the channel names glued to the prose, so [`visible-text.ts`](src/agent/visible-text.ts)
   strips them by pattern. It is unit-checked against the shapes observed in practice, but a
   model that invents a new channel name would need a new rule.
+- **SKUs still reach the customer sometimes.** The prompt tells the agent to name a book by its
+  title and keep SKUs in tool arguments, and it mostly does — but it is an instruction, not a
+  guarantee, and a run will occasionally offer *"A Brief History of Time (SKU 9780553380163)"*.
+  The durable fix is to stop putting SKUs in the model's context at all: hand it an opaque item
+  reference from `lookup_order`, have `start_return` take that, and let the backend resolve it.
+  Then there is no SKU available to leak.
 - **The agent will still occasionally reason from an empty result.** Asked about vinyl records
   it usually says it cannot confirm, which is right; sometimes it concludes Bookly does not
   stock them, which happens to be true but is not something retrieval told it. Grounding is

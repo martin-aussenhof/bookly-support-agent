@@ -12,18 +12,73 @@ import { cn } from "@/lib/utils";
 import type { ToolItem } from "@/types/chat";
 
 /**
- * Renders one tool invocation in the transcript.
+ * What the agent did, in the customer's words.
  *
- * Tool use is shown, not hidden. A support agent that silently "knows" an order
- * status is indistinguishable from one that made it up; showing the call and
- * letting a reviewer expand the raw payload is what makes the answer auditable.
- *
- * Visually it sits *quieter* than the conversation — it is evidence, not the
- * answer — until something goes wrong or a write action fires, at which point
- * the accent border pulls it forward.
+ * Keyed on the tool and its outcome rather than on anything the backend
+ * returned, so this cannot leak a payload even by accident. `lookup_order`
+ * failing for a missing order and failing because the email belongs to someone
+ * else deliberately read the same: the customer is told what to do next by the
+ * agent's own reply, and the difference between those two is not their business.
  */
-export function ToolCard({ tool }: { tool: ToolItem }) {
+const ACTIVITY: Record<string, Record<ToolItem["status"], string>> = {
+  lookup_order: {
+    running: "Looking up your order",
+    ok: "Checked your order",
+    error: "Couldn't find that order",
+  },
+  search_help_center: {
+    running: "Checking the help centre",
+    ok: "Checked the help centre",
+    error: "Couldn't check the help centre",
+  },
+  start_return: {
+    running: "Setting up your return",
+    ok: "Return filed",
+    error: "Couldn't file that return",
+  },
+  escalate_to_human: {
+    running: "Finding a colleague",
+    ok: "Passed to a colleague",
+    error: "Couldn't reach a colleague",
+  },
+};
+
+function activity(tool: ToolItem): string {
+  // The fallback never names the tool — a capability added later must not start
+  // leaking its internal name to customers just because this map was missed.
+  return ACTIVITY[tool.name]?.[tool.status] ?? (tool.status === "error" ? "That didn't work" : "Working");
+}
+
+/**
+ * Renders one tool invocation in the transcript, in one of two views.
+ *
+ * Tool use is shown, not hidden: a support agent that silently "knows" an order
+ * status is indistinguishable from one that made it up, and being able to see
+ * the call and its raw result is what makes the answer auditable. But "shown"
+ * and "shown to the customer" are different claims. A tool name in monospace
+ * and a JSON payload are written for whoever is evaluating the agent, so they
+ * live behind the inspect toggle, and the customer gets a plain line saying
+ * what happened.
+ *
+ * Both views carry the same `data-*` attributes: they are the contract the
+ * end-to-end specs read, and they describe the call rather than displaying it.
+ */
+export function ToolCard({ tool, inspect }: { tool: ToolItem; inspect: boolean }) {
   const [open, setOpen] = useState(false);
+
+  if (!inspect) {
+    return (
+      <div
+        data-testid="tool-card"
+        data-tool={tool.name}
+        data-status={tool.status}
+        className="text-muted-foreground flex items-center gap-2 text-xs sm:pl-4"
+      >
+        <StatusIcon status={tool.status} />
+        <span>{activity(tool)}</span>
+      </div>
+    );
+  }
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="sm:pl-4">

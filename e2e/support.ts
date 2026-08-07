@@ -11,8 +11,16 @@ import { expect, type Locator, type Page } from "@playwright/test";
 /** Emitted exactly once per completed turn — the reliable finish signal. */
 const TURN_MARKER = "turn-usage";
 
+/**
+ * Opens the chat in the reviewer's view.
+ *
+ * `?inspect=1` because these specs assert on tool payloads and wait on the
+ * per-turn usage line, neither of which a customer is shown. It is also the
+ * right view to record: the demos exist to prove the answers are grounded, and
+ * that argument is the expanded tool card.
+ */
 export async function openChat(page: Page) {
-  await page.goto("/");
+  await page.goto("/?inspect=1");
   await expect(page.getByTestId("composer-input")).toBeVisible();
   // Let the first paint settle before the recording starts moving.
   await page.waitForTimeout(700);
