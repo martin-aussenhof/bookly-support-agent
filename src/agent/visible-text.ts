@@ -63,8 +63,18 @@ const REASONING = new Set<string>(REASONING_TAGS);
 /** Enough to hold the longest marker plus the character that proves it is one. */
 const HOLD_BACK = Math.max(...ALL_TAGS.map((tag) => tag.length)) + 1;
 
-/** Only these can precede a mid-reply marker. */
-const BOUNDARY = /[.!?\n]/;
+/**
+ * What may precede a mid-reply marker: punctuation or a symbol, never a letter,
+ * digit, or space.
+ *
+ * Sentence-ending punctuation alone was too narrow. When the model quotes a
+ * tool result back — which it does, despite being told not to — the marker
+ * lands against the closing brace of the JSON (`"error":null}assistantanalysis`)
+ * and sailed straight through. Excluding letters and digits keeps "your final
+ * refund" and "£12.99final" intact, since the character before the word is a
+ * space or a digit in those.
+ */
+const BOUNDARY = /[^\p{L}\p{N}\s]/u;
 
 type Mode = "detecting" | "reasoning" | "visible";
 
@@ -96,10 +106,12 @@ export class VisibleTextFilter {
   }
 
   private drain(atEnd: boolean): string {
+    let out = "";
+
     for (;;) {
       if (this.mode === "detecting") {
         // Wait until there is enough to tell a marker from ordinary prose.
-        if (!atEnd && this.buffer.length <= HOLD_BACK) return "";
+        if (!atEnd && this.buffer.length <= HOLD_BACK) return out;
 
         const tag = this.tagAt(0);
         if (tag) {
@@ -117,22 +129,32 @@ export class VisibleTextFilter {
           // Drop the private text, but keep a tail in case a marker is split
           // across this delta and the next.
           if (this.buffer.length > HOLD_BACK) this.buffer = this.buffer.slice(-HOLD_BACK);
-          return "";
+          return out;
         }
         this.buffer = this.buffer.slice(end);
         this.mode = "visible";
         continue;
       }
 
-      return this.drainVisible(atEnd);
+      const drained = this.drainVisible(atEnd);
+      out += drained.text;
+      // A reasoning channel opened mid-reply: go round again and suppress it.
+      if (!drained.reopenedPrivate) return out;
     }
   }
 
-  /** Emits reply text, dropping any channel marker sitting on a boundary. */
-  private drainVisible(atEnd: boolean): string {
+  /**
+   * Emits reply text up to the next channel marker.
+   *
+   * A marker is a transition, not litter. Stripping a reasoning tag and
+   * carrying on would leave the thinking that follows it on screen, which is
+   * exactly what the filter exists to prevent — so hitting one hands control
+   * back to the reasoning branch.
+   */
+  private drainVisible(atEnd: boolean): { text: string; reopenedPrivate: boolean } {
     // While streaming, stop short of the end: the tail may be half a marker.
     const limit = atEnd ? this.buffer.length : this.buffer.length - HOLD_BACK;
-    if (limit <= 0) return "";
+    if (limit <= 0) return { text: "", reopenedPrivate: false };
 
     let out = "";
     let index = 0;
@@ -142,8 +164,16 @@ export class VisibleTextFilter {
       const tag = previous && BOUNDARY.test(previous) ? this.tagAt(index) : null;
 
       if (tag) {
-        index += tag.length;
-        continue;
+        this.buffer = this.buffer.slice(index + tag.length);
+        if (out) this.lastEmitted = out[out.length - 1];
+
+        if (REASONING.has(tag)) {
+          this.mode = "reasoning";
+          return { text: out, reopenedPrivate: true };
+        }
+        // A final or bare marker: drop it and keep reading the reply after it.
+        const rest = this.drainVisible(atEnd);
+        return { text: out + rest.text, reopenedPrivate: rest.reopenedPrivate };
       }
       out += this.buffer[index];
       index += 1;
@@ -151,7 +181,7 @@ export class VisibleTextFilter {
 
     this.buffer = this.buffer.slice(index);
     if (out) this.lastEmitted = out[out.length - 1];
-    return out;
+    return { text: out, reopenedPrivate: false };
   }
 
   /** The marker starting exactly at `index`, if one does. */

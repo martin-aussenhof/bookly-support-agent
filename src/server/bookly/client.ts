@@ -70,46 +70,82 @@ export interface ReturnEligibility {
 /** Fault reasons. Bookly pays the return postage on these. */
 const FAULT_REASONS: ReadonlySet<ReturnReasonCode> = new Set(["damaged", "wrong_item"]);
 
-export function checkReturnEligibility(
-  order: Order,
-  sku: string,
-  reasonCode: ReturnReasonCode,
-): ReturnEligibility {
+export interface ItemReturnable {
+  returnable: boolean;
+  /** Why not, in words a customer can be told. Empty when it is returnable. */
+  reason: string;
+  daysSinceDelivery: number | null;
+}
+
+/**
+ * Whether an item *can* come back at all, independent of why the customer wants
+ * to send it. Final sale, delivery state, and the 30-day window decide this;
+ * the reason code only ever changes who pays the postage.
+ *
+ * Split out so it can be answered at lookup time as well as at write time. An
+ * agent that only learns an item is final sale by attempting the return has to
+ * promise the customer something first and take it back afterwards, and a raw
+ * `finalSale: true` in a tool result is not an answer — it is a flag the model
+ * has to interpret, which is the prompt-shaped failure this project avoids
+ * everywhere else. One function, so the sentence shown while browsing and the
+ * refusal issued on write cannot drift apart.
+ */
+export function checkItemReturnable(order: Order, sku: string): ItemReturnable {
   const item = order.items.find((i) => i.sku === sku);
-  const base: ReturnEligibility = {
-    eligible: false,
-    reason: "",
-    daysSinceDelivery: null,
-    refundCents: 0,
-    feeCents: 0,
-  };
+  const no = (reason: string, daysSinceDelivery: number | null = null): ItemReturnable => ({
+    returnable: false,
+    reason,
+    daysSinceDelivery,
+  });
 
   if (!item) {
-    return { ...base, reason: `Order ${order.id} does not contain SKU ${sku}.` };
+    return no(`Order ${order.id} does not contain SKU ${sku}.`);
   }
   if (item.finalSale) {
-    return {
-      ...base,
-      reason: `"${item.title}" is a signed or clearance edition and is final sale, so it cannot be returned.`,
-    };
+    return no(
+      `"${item.title}" is a signed or clearance edition and is final sale, so it cannot be returned.`,
+    );
   }
   if (!order.shipment?.deliveredAt) {
-    return {
-      ...base,
-      reason: `Order ${order.id} has not been delivered yet, so it cannot be returned. It can still be cancelled while processing.`,
-    };
+    return no(
+      `Order ${order.id} has not been delivered yet, so it cannot be returned. It can still be cancelled while processing.`,
+    );
   }
 
   const deliveredAt = new Date(order.shipment.deliveredAt);
   const daysSinceDelivery = Math.floor((Date.now() - deliveredAt.getTime()) / 86_400_000);
 
   if (daysSinceDelivery > RETURN_WINDOW_DAYS) {
-    return {
-      ...base,
+    return no(
+      `Delivered ${daysSinceDelivery} days ago, outside the ${RETURN_WINDOW_DAYS}-day return window.`,
       daysSinceDelivery,
-      reason: `Delivered ${daysSinceDelivery} days ago, outside the ${RETURN_WINDOW_DAYS}-day return window.`,
+    );
+  }
+
+  return { returnable: true, reason: "", daysSinceDelivery };
+}
+
+export function checkReturnEligibility(
+  order: Order,
+  sku: string,
+  reasonCode: ReturnReasonCode,
+): ReturnEligibility {
+  const allowed = checkItemReturnable(order, sku);
+
+  if (!allowed.returnable) {
+    return {
+      eligible: false,
+      reason: allowed.reason,
+      daysSinceDelivery: allowed.daysSinceDelivery,
+      refundCents: 0,
+      feeCents: 0,
     };
   }
+
+  // `checkItemReturnable` only returns true for an item that exists on a
+  // delivered order inside the window, so both of these are settled by now.
+  const item = order.items.find((i) => i.sku === sku)!;
+  const daysSinceDelivery = allowed.daysSinceDelivery!;
 
   // The help centre promises free return postage on faulty or mis-shipped
   // items. Encoding that here rather than trusting the agent to remember it is

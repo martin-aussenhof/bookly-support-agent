@@ -127,7 +127,8 @@ model wrote. The reply and the receipt cannot disagree.
 
 > **You:** I'd like to return the signed Ishiguro from BK-10774, maya.chen@example.com
 
-**Fires:** `lookup_order` → the return is **refused**, final sale.
+**Fires:** `lookup_order` → the return is **refused**, final sale — usually without spending a
+write call, because the lookup already said the item cannot come back.
 
 Then, without starting a new chat:
 
@@ -138,6 +139,12 @@ Then, without starting a new chat:
 **Point at:** the refusal is per *item*, not per order — a prompt-level rule would almost
 certainly have blocked the whole order or none of it. And the "no" is not a dead end: the
 agent stays useful in the same conversation.
+
+The agent knows before it tries. `lookup_order` reports each item as returnable or not, with
+the reason, decided by the same function that refuses the write — so the agent declines
+straight away instead of asking for a return reason it cannot use and withdrawing the offer a
+turn later. Handing the model a bare `finalSale: true` and hoping it knows what Bookly does
+about that is the prompt-shaped failure this project avoids everywhere else.
 
 ---
 
@@ -336,6 +343,11 @@ Two paths are handled in code rather than left to the model:
   it already tried. The one case where the agent has demonstrably failed is not allowed to
   dead-end — it lands in the same queue, with the same reason code, as an escalation the
   model chose, so escalation counts stay honest either way.
+- **A turn that produced nothing.** GPT-OSS occasionally writes a tool call as prose rather
+  than emitting one, and the provider parses no call from it — leaving an iteration with no
+  tool calls and no visible text. Withholding ungrounded prose is what makes that reachable,
+  and it is still the right trade, but silence is not an answer either. The customer gets a
+  short apology and an invitation to retry, and the server logs it.
 - **Provider or network failure.** The customer gets a plain apology. The provider's own
   wording — auth failures, rate-limit text, socket errors — goes to the server log, and is
   attached to the message only outside production so whoever is running the demo can see it.

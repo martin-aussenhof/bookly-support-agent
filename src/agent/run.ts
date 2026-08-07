@@ -73,6 +73,8 @@ export async function* runAgent(
   const toolsAttempted: string[] = [];
 
   let iterations = 0;
+  /** Whether the customer was told anything at all this turn. */
+  let spoke = false;
   let turnPromptTokens = 0;
   let turnCompletionTokens = 0;
   let turnCostUsd = 0;
@@ -161,6 +163,7 @@ export async function* runAgent(
        * produced no text as soon as the next card seals them.
        */
       if (calls.length === 0 && text) {
+        spoke = true;
         yield emit({ type: "text_delta", text });
       }
 
@@ -283,6 +286,29 @@ export async function* runAgent(
       session.messages.push({ role: "assistant", content: message });
       yield emit({ type: "notice", message });
       return;
+    }
+
+    /**
+     * A turn must never end in silence.
+     *
+     * It can, without this. GPT-OSS occasionally writes a tool call as prose
+     * rather than emitting it as one — `assistantcommentary to=functions.…` —
+     * and the provider parses no tool call from it. The loop then sees an
+     * iteration with no calls and no visible text, breaks, and the customer is
+     * left looking at a couple of tool cards and nothing else, with no way to
+     * tell whether the agent is still thinking.
+     *
+     * Withholding ungrounded prose is what makes this reachable, and it is
+     * still the right trade: saying nothing beats saying something invented.
+     * But saying nothing is not an answer either, so it gets a reply.
+     */
+    if (!spoke) {
+      console.warn("[agent] turn produced no reply", { sessionId, iterations, finishReason });
+      const message =
+        "Sorry — I lost my thread on that one. Could you say it again? " +
+        "If it happens twice, ask for a human and I'll hand you over.";
+      session.messages.push({ role: "assistant", content: message });
+      yield emit({ type: "notice", message });
     }
 
     yield emit({ type: "done", finishReason, iterations });

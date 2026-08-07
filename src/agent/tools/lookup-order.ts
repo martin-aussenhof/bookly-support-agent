@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getOrderForCustomer } from "@/server/bookly/client";
+import { checkItemReturnable, getOrderForCustomer } from "@/server/bookly/client";
 import { BooklyError } from "@/server/bookly/types";
 import { gbp, plainDate, plainStatus } from "./format";
 import { defineTool } from "./types";
@@ -48,10 +48,19 @@ export const lookupOrder = defineTool({
           customerName: order.customerName,
           totalCents: order.totalCents,
           total: gbp(order.totalCents),
-          items: order.items.map((item) => ({
-            ...item,
-            unitPrice: gbp(item.unitPriceCents),
-          })),
+          // Each item says whether it can come back and, if not, why — decided
+          // by the same function that will refuse the write. Without this the
+          // model sees `finalSale: true`, has no way to know what Bookly does
+          // about that, and cheerfully offers a return it cannot deliver.
+          items: order.items.map((item) => {
+            const allowed = checkItemReturnable(order, item.sku);
+            return {
+              ...item,
+              unitPrice: gbp(item.unitPriceCents),
+              returnable: allowed.returnable,
+              ...(allowed.returnable ? {} : { notReturnableBecause: allowed.reason }),
+            };
+          }),
           shipment: order.shipment && {
             ...order.shipment,
             estimatedDeliveryOn: plainDate(order.shipment.estimatedDelivery),
