@@ -73,8 +73,11 @@ function activity(tool: ToolItem): string {
  * live behind the inspect toggle, and the customer gets a plain line saying
  * what happened.
  *
- * Both views carry the same `data-*` attributes: they are the contract the
- * end-to-end specs read, and they describe the call rather than displaying it.
+ * Both views carry the same `data-*` attributes, including the backend's own
+ * one-line `data-summary`. They are the contract the end-to-end specs read:
+ * because the facts are in attributes rather than in rendered text, the demos
+ * can be recorded in the customer view and still assert on the refund, the
+ * refusal, and the empty search — none of which a customer is shown.
  */
 export function ToolCard({ tool, inspect }: { tool: ToolItem; inspect: boolean }) {
   const [open, setOpen] = useState(false);
@@ -85,6 +88,7 @@ export function ToolCard({ tool, inspect }: { tool: ToolItem; inspect: boolean }
         data-testid="tool-card"
         data-tool={tool.name}
         data-status={tool.status}
+        data-summary={tool.summary}
         className="text-muted-foreground flex items-center gap-2 text-xs sm:pl-4"
       >
         <StatusIcon status={tool.status} />
@@ -99,6 +103,7 @@ export function ToolCard({ tool, inspect }: { tool: ToolItem; inspect: boolean }
         data-testid="tool-card"
         data-tool={tool.name}
         data-status={tool.status}
+        data-summary={tool.summary}
         className={cn(
           "bg-card/60 overflow-hidden rounded-xl border backdrop-blur-sm transition-colors",
           tool.status === "error" && "border-destructive/35 bg-destructive/5",

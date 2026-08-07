@@ -56,6 +56,10 @@ export function ChatPanel({ initialUsage, initialItems }: ChatPanelProps) {
       className="app-ambient flex h-dvh flex-col"
       data-testid="chat-panel"
       data-streaming={isStreaming ? "true" : "false"}
+      // Completed turns. The per-turn cost line used to be the finish signal
+      // the specs waited on, but it is not rendered in the customer view — and
+      // a test hook that only exists in one of two views is a trap.
+      data-turns={items.filter((item) => item.kind === "usage").length}
     >
       <header className="bg-background/70 supports-backdrop-filter:bg-background/55 sticky top-0 z-30 border-b backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-360 items-center gap-3 px-4 py-2.5 sm:px-6 sm:py-3 lg:px-8">

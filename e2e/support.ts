@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * Helpers shared by the demo recordings.
@@ -6,21 +6,15 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * The one thing that matters here is `say()`: it waits for the *turn* to
  * finish, not for text to appear. A turn can involve several model calls and
  * several tool round-trips, so anything that waits on a string is guessing.
- */
-
-/** Emitted exactly once per completed turn — the reliable finish signal. */
-const TURN_MARKER = "turn-usage";
-
-/**
- * Opens the chat in the reviewer's view.
  *
- * `?inspect=1` because these specs assert on tool payloads and wait on the
- * per-turn usage line, neither of which a customer is shown. It is also the
- * right view to record: the demos exist to prove the answers are grounded, and
- * that argument is the expanded tool card.
+ * Everything runs in the customer view — the one a visitor actually gets. The
+ * specs still assert on what the backend decided, by reading the `data-*`
+ * attributes each tool card carries in both views rather than by opening a
+ * panel of JSON that is not part of the product.
  */
+
 export async function openChat(page: Page) {
-  await page.goto("/?inspect=1");
+  await page.goto("/");
   await expect(page.getByTestId("composer-input")).toBeVisible();
   // Let the first paint settle before the recording starts moving.
   await page.waitForTimeout(700);
@@ -33,7 +27,8 @@ export async function openChat(page: Page) {
  * the artefact, and an instantly-populated input looks like a bug.
  */
 export async function say(page: Page, text: string) {
-  const before = await page.getByTestId(TURN_MARKER).count();
+  const panel = page.getByTestId("chat-panel");
+  const before = Number((await panel.getAttribute("data-turns")) ?? 0);
 
   const input = page.getByTestId("composer-input");
   await input.click();
@@ -41,16 +36,16 @@ export async function say(page: Page, text: string) {
   await page.waitForTimeout(250);
   await page.getByTestId("composer-send").click();
 
-  // The turn is done when a new usage line lands. Falls back to the streaming
-  // flag so a turn that errors before accounting still releases the wait.
+  // The turn is done when the completed-turn count moves. Falls back to the
+  // error notice so a turn that fails before accounting still releases the wait.
   await Promise.race([
-    expect(page.getByTestId(TURN_MARKER)).toHaveCount(before + 1, { timeout: 150_000 }),
+    expect(panel).toHaveAttribute("data-turns", String(before + 1), { timeout: 150_000 }),
     expect(page.getByTestId("notice")).toHaveAttribute("data-tone", "error", {
       timeout: 150_000,
     }),
   ]);
 
-  await expect(page.getByTestId("chat-panel")).toHaveAttribute("data-streaming", "false");
+  await expect(panel).toHaveAttribute("data-streaming", "false");
   // Beat of silence so the finished answer is readable in the recording.
   await page.waitForTimeout(900);
 }
@@ -74,18 +69,6 @@ export async function confirmUntil(page: Page, selector: string, reply: string, 
   }
 }
 
-/** Opens a tool card so the recording shows the evidence behind an answer. */
-export async function revealTool(page: Page, name: string) {
-  await revealCard(page, page.locator(toolSelector(name)).last());
-}
-
-/** Opens one specific card, when which card matters. */
-export async function revealCard(page: Page, card: Locator) {
-  await expect(card).toBeVisible();
-  await card.getByRole("button").first().click();
-  await page.waitForTimeout(1600);
-}
-
 /**
  * `status` narrows to a successful or failed call. That matters when the model
  * makes a call the schema rejects: the refusal is its own card, and it says
@@ -96,6 +79,20 @@ export function toolSelector(name: string, status?: "ok" | "error") {
     `[data-testid="tool-card"][data-tool="${name}"]` +
     (status ? `[data-status="${status}"]` : "")
   );
+}
+
+/**
+ * Clears the conversation between demos.
+ *
+ * The reel is one continuous recording, so this is the visible seam between
+ * one demo and the next — and it is a real feature rather than a test hook:
+ * the server drops the stored transcript and rotates the session cookie.
+ */
+export async function newChat(page: Page) {
+  await page.getByTestId("new-chat").click();
+  await expect(page.getByTestId("message-user")).toHaveCount(0);
+  await expect(page.getByTestId("tool-card")).toHaveCount(0);
+  await page.waitForTimeout(900);
 }
 
 /** Scrolls the transcript to the bottom and holds, for a clean final frame. */

@@ -48,21 +48,11 @@ Note: This should also work with `npm` as package manager, but I haven't tested 
 
 ## 🎬 Demo cases
 
-**Three demos, in this order — about two minutes end to end.** The agent is capable, then
-constrained, then honest. That arc is the whole argument, and a fourth variation on a flow
-already shown would add running time without adding to it.
+Run the three demos below in order. Together, they take around two minutes and show how the agent handles a successful request, a restricted action, and a question it cannot answer reliably.
 
-Every line under **You** is copy-pasteable.
+Everything under You is ready to copy and paste.
 
-**Turn on the `{ }` toggle in the header before you present.** The chat opens in the view a
-customer would get: the agent says what it is doing in its own voice — _"I've pulled up your
-order"_, _"I've checked our policies"_ — and nothing else. Tool names, arguments, results and
-token counts are not written for a customer, so they are not shown to one. The toggle switches to the reviewer's view, where every call
-expands to its raw input and result. That panel is what makes an answer auditable rather than
-merely fluent, and it is the thing worth clicking open on stage.
-
-[bookly-support.vercel.app/?inspect=1](https://bookly-support.vercel.app/?inspect=1) opens
-straight into it.
+If you want to see the tool calls, including their raw inputs and results, turn on the `{ }` toggle in the header.
 
 |                                                 | Demo 1 | Demo 2 | Demo 3 |
 | ----------------------------------------------- | ------ | ------ | ------ |
@@ -74,7 +64,7 @@ straight into it.
 
 Eight orders across four customers, in
 [`src/server/bookly/data/orders.ts`](src/server/bookly/data/orders.ts). Dates are stored as
-offsets from _now_, so the inside/outside-the-return-window cases stay correct whenever you
+offsets from _now_ (for demo purposes), so the inside/outside-the-return-window cases stay correct whenever you
 run it. Each order exists to make one branch reachable.
 
 The agent will not open an order without a matching email — that check is enforced in the
@@ -112,11 +102,11 @@ This one demo carries all three of the brief's minimum requirements.
 
 **Expect:** £2.99 return-label fee → **£16.00 refunded** on a £18.99 book.
 
-**Point at:** it did not pick a book for you, and it confirmed before spending your money. The
+**Proof point:** it did not pick a book for you, and it confirmed before spending your money. The
 cheapest way to make an agent dangerous is to let it resolve ambiguity silently on a write
 action.
 
-**Then, if the room is technical:** run the same flow with a damaged book — _"My copy of
+**(Optional):** run the same flow with a damaged book — _"My copy of
 Piranesi turned up with a torn cover"_, `BK-10655`, `priya.raman@example.com`. Same tool, same
 order shape, but the fee is **waived** and the full **£14.50** comes back, because
 `reasonCode` is a priced enum evaluated in `checkReturnEligibility` rather than a sentence the
@@ -139,21 +129,15 @@ Then, without starting a new chat:
 
 **Fires:** `start_return` → **succeeds**, £10.00 refunded.
 
-**Point at:** the refusal is per _item_, not per order — a prompt-level rule would almost
+**Proof point:** the refusal is per _item_, not per order — a prompt-level rule would almost
 certainly have blocked the whole order or none of it. And the "no" is not a dead end: the
 agent stays useful in the same conversation.
-
-The agent knows before it tries. `lookup_order` reports each item as returnable or not, with
-the reason, decided by the same function that refuses the write — so the agent declines
-straight away instead of asking for a return reason it cannot use and withdrawing the offer a
-turn later. Handing the model a bare `finalSale: true` and hoping it knows what Bookly does
-about that is the prompt-shaped failure this project avoids everywhere else.
 
 ---
 
 ### Demo 3 — It declines to invent
 
-The one worth showing. Nothing in the help centre covers this.
+Nothing in the help centre covers this.
 
 > **You:** Do you sell vinyl records?
 
@@ -162,55 +146,31 @@ The one worth showing. Nothing in the help centre covers this.
 **Expect:** the agent says it can't confirm, and offers a human. It does not improvise a
 product range.
 
-**Point at:** open the tool card and show the empty result, then the reply. Retrieval that
-can return nothing is what makes "I don't know" reachable. Contrast with:
-
-> **You:** How long do refunds take?
-
-**Fires:** `search_help_center` → 3 articles → answered from their text, 3–5 business days.
+**Proof point:** Agent doesn't try to help with requests that it can't help with.
 
 ---
-
-### Also covered, without video
-
-Two behaviours matter enough to test but do not earn a slot in a two-minute demo, so they live
-in [`e2e/regression.spec.ts`](e2e/regression.spec.ts):
-
-- **An order is not readable with the wrong email.** Ask for `BK-10774` as
-  `someone.else@example.com` and `lookup_order` returns `forbidden`. No order details reach
-  the model at all, so there is nothing for it to leak — the check lives in
-  `getOrderForCustomer`, not the system prompt.
-- **A conversation survives a reload.** Restored from Neon via the session cookie, server-rendered.
-
-Unscripted fixtures worth trying by hand: `BK-09877` (delivered 58 days ago — refused, then ask
-for a person and watch `escalate_to_human` write a handover note for the colleague picking it
-up), `BK-10601` (still processing — refuses the return, offers cancellation instead), and
-`BK-10233` (marked delivered but never arrived).
 
 ### Recording the demos
 
 ```bash
-pnpm demo            # headless, records the three demos
+pnpm demo            # headless, records the reel
 pnpm demo:headed     # watch it drive the browser
-pnpm demo -g "declines to invent"   # just one
 ```
 
-Playwright drives the demo script above against a **real** model and writes one `video.webm`
-per demo to `recordings/`. It builds and starts the production server itself, so
-`TOGETHER_API_KEY` must be set. A full run takes about 90 seconds and costs a fraction of a
-cent. The regression specs run in the same command but record nothing.
+Playwright drives the demo script above against a **real** model and records all three demos
+as **one continuous take** — `recordings/demos-the-demo-reel-demo/video.webm`, about a minute
+of 1280×800. One file rather than three, because the artefact is something a person watches
+start to finish; the "New chat" between demos is the seam, and it is a real feature rather
+than a test hook. Each demo is a `test.step`, so a failure still names the one that broke.
 
-These are also the only end-to-end coverage of the streaming and tool-calling path, which unit
-tests cannot reach. Assertions are deliberately about **backend-determined** behaviour — which
-tools fired, what was refused, what the refund was — never the model's wording, and never the
-exact number of times it chose to call a read-only tool. A demo that fails because the agent
-phrased something differently is a demo nobody trusts.
+It builds and starts the production server itself, so `TOGETHER_API_KEY` must be set. A full
+run takes about 90 seconds and costs a fraction of a cent.
 
-Each spec gets **one retry**, because the subject under test is a sampled model rather than a
-function: the agent occasionally spends an attempt on a malformed tool call the schema refuses
-and never completes the search a demo is written around. One retry and not three — failing
-twice running is a signal, and since every assertion is backend-determined a genuine
-regression still fails every time.
+The reel records in the **customer view** — the product, not the debugger. The specs still
+assert on what the backend decided, by reading the `data-summary` every tool card carries in
+both views rather than by opening a panel of JSON that is not part of the product. So the
+recording shows a support agent while the assertions still check the refund was £16.00, the
+signed edition was refused, and the help-centre search genuinely came back empty.
 
 ## 🏗 Architecture
 
@@ -237,7 +197,7 @@ Browser  ──POST /api/chat──▶  Route  ──▶  runAgent()  ──▶ 
 | `src/hooks/use-inspect.ts`    | Which of the two views you are in.                                                                                                                            |
 | `src/agent/events.ts`         | The single `AgentEvent` union shared by the loop, the route, and the client hook.                                                                             |
 
-### Three decisions worth defending
+### Three key decisions
 
 **Policy lives in the backend, not the prompt.** The 30-day return window, the label fee, and
 the "this order belongs to a different customer" check are enforced in `src/server/bookly/client.ts`.
@@ -253,27 +213,6 @@ Bookly's policies or any customer's orders. Every factual claim has to come back
 inputs, tool results, and the system prompt never travel to the browser as state, and the
 transcript the model reads can't be edited by the client.
 
-### Two views of the same transcript
-
-Showing the tool calls is the grounding argument. Showing them _to the customer_ is a
-different claim, and a worse one — `lookup_order`, a JSON payload, and `3,092 in · 460 out`
-are written for whoever is evaluating the agent.
-
-So the transcript renders twice from the same items. The customer view says what happened in
-their language, keyed on the tool and its outcome rather than on anything the backend
-returned — which means it cannot leak a payload even by accident, because in that mode the
-component never reads one. A failed lookup and an order belonging to somebody else read
-identically on purpose: the agent's own reply tells the customer what to do next, and the
-difference between those two is not their business. Consecutive identical calls collapse to
-one line there, so a model that searches twice does not stutter at the customer.
-
-The `{ }` toggle switches to the reviewer's view, which hides nothing — every call, every
-duplicate, every payload, and the cost of each turn. The preference persists, and `?inspect=1`
-opens straight into it, which is how the demos are recorded.
-
-Both views carry the same `data-tool` and `data-status` attributes: they describe the call
-rather than display it, so the end-to-end specs read one contract regardless of view.
-
 ### Only a finished thought is shown
 
 A model call that ends in tool calls often writes prose first, and that prose is by definition
@@ -284,7 +223,7 @@ corrected two seconds later by the real one.
 So the loop holds an iteration's text until the model stops calling tools, and discards it
 otherwise. This is why a reply lands whole rather than typing itself out: content arrives
 _before_ tool-call deltas, so there is no point at which it could be streamed and still taken
-back before the customer had read it. Tool cards stream throughout, so the wait is not silent.
+back before the customer had read it.
 
 ## 🧠 Conversation persistence
 
@@ -310,12 +249,6 @@ reads) and `transcript` (what the browser renders). They are folded by the _same
 [`src/agent/transcript.ts`](src/agent/transcript.ts), shared by the loop and the client hook —
 so a restored conversation is identical to the one you watched, tool cards and costs included,
 rather than a lookalike rebuilt by a second implementation that would eventually drift.
-
-## 💷 Cost meter
-
-The header shows **total spend across every session**, not just the current browser, because
-cost per resolved conversation is the number that decides whether a model choice survives
-production traffic. Each turn also prints its own token count and cost under the reply.
 
 **To change prices, edit [`src/server/usage/pricing.ts`](src/server/usage/pricing.ts).** It is
 one table of `model id → USD per 1M input/output tokens`, in the same units Together quotes on

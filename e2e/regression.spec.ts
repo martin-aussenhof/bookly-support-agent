@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { openChat, revealTool, say } from "./support";
+import { openChat, say, toolSelector } from "./support";
 
 /**
  * End-to-end coverage that is not part of the demo script.
@@ -23,11 +23,10 @@ test.beforeEach(async ({ page }) => {
 test("an order is not readable with the wrong email", async ({ page }) => {
   await say(page, "What's the status of BK-10774? My email is someone.else@example.com");
 
-  const lookup = page.locator('[data-testid="tool-card"][data-tool="lookup_order"]').last();
+  const lookup = page.locator(toolSelector("lookup_order")).last();
   await expect(lookup).toHaveAttribute("data-status", "error");
-  await revealTool(page, "lookup_order");
   // The model never received the order, so there is nothing for it to leak.
-  await expect(lookup).toContainText("forbidden");
+  await expect(lookup).toHaveAttribute("data-summary", /forbidden/);
 });
 
 test("a conversation survives a reload", async ({ page }) => {

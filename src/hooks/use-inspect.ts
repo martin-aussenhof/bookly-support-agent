@@ -16,11 +16,18 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
  * stored preference is applied. That puts the one frame of flicker on the
  * rarer, more deliberate mode, which is the right way round.
  *
- * `?inspect=1` sets it too, so a link can open straight into the reviewer's
- * view — which is how the recorded demos run.
+ * `?inspect=1` opens a link straight into the reviewer's view, but only for
+ * that page view — it deliberately does not write the preference. An earlier
+ * version persisted it, so following the inspect link once left every later
+ * visit showing tool names and JSON, and the only clue was a toggle nobody
+ * remembered pressing. A URL is a way to look at something once; the toggle is
+ * how you choose.
  */
 
 const STORAGE_KEY = "bookly:inspect";
+
+/** Set by `?inspect=`, and never written to storage. Outranks the preference. */
+let override: boolean | null = null;
 
 const listeners = new Set<() => void>();
 
@@ -35,6 +42,7 @@ function subscribe(onChange: () => void) {
 }
 
 function read(): boolean {
+  if (override !== null) return override;
   return localStorage.getItem(STORAGE_KEY) === "1";
 }
 
@@ -43,8 +51,7 @@ function readOnServer(): boolean {
   return false;
 }
 
-function write(on: boolean) {
-  localStorage.setItem(STORAGE_KEY, on ? "1" : "0");
+function announce() {
   // `storage` only fires in *other* tabs, so this tab is told directly.
   for (const listener of listeners) listener();
 }
@@ -54,10 +61,19 @@ export function useInspect(): readonly [boolean, () => void] {
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("inspect");
-    if (requested === "1" || requested === "0") write(requested === "1");
+    if (requested === "1" || requested === "0") {
+      override = requested === "1";
+      announce();
+    }
   }, []);
 
-  const toggle = useCallback(() => write(!read()), []);
+  const toggle = useCallback(() => {
+    const next = !read();
+    // Choosing beats being linked: a click settles it and the URL stops mattering.
+    override = null;
+    localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+    announce();
+  }, []);
 
   return [inspect, toggle] as const;
 }
